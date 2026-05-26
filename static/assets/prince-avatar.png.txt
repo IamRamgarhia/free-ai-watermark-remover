@@ -1,0 +1,3 @@
+Replace this placeholder file with prince-avatar.png (square, ~200x200 PNG).
+The About page automatically falls back to your GitHub avatar at
+https://avatars.githubusercontent.com/u/3993100?v=4 if this file is missing.

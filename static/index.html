@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <!-- ===== Primary SEO meta ===== -->
+  <title>WatermarkOut — Free AI Watermark Remover for Images &amp; Videos (Runs in Your Browser)</title>
+  <meta name="description" content="Remove watermarks from AI-generated images (Gemini, DALL·E, Midjourney, Firefly) and short videos. 100% free, private, and offline — the AI runs entirely in your browser. No accounts, no uploads, no cloud.">
+  <meta name="keywords" content="watermark remover, ai watermark removal, remove gemini watermark, remove dall-e watermark, remove midjourney watermark, free watermark remover, online watermark remover, browser watermark remover, ai image cleaner, video watermark remover, free ai tool, privacy">
+  <meta name="author" content="Prince Ramgarhia (DiceCodes)">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://iamramgarhia.github.io/watermarkout-/">
+
+  <!-- ===== Theme + PWA ===== -->
+  <meta name="theme-color" content="#7c3aed">
+  <meta name="application-name" content="WatermarkOut">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="WatermarkOut">
+  <meta name="format-detection" content="telephone=no">
+
+  <!-- ===== Open Graph (Facebook, LinkedIn, Slack, Discord previews) ===== -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://iamramgarhia.github.io/watermarkout-/">
+  <meta property="og:title" content="WatermarkOut — Free AI Watermark Remover (Browser-Based)">
+  <meta property="og:description" content="Remove watermarks from AI-generated images and videos. Runs entirely in your browser — no uploads, no accounts, free forever.">
+  <meta property="og:image" content="https://iamramgarhia.github.io/watermarkout-/assets/social-preview.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="WatermarkOut — Free AI Watermark Remover">
+  <meta property="og:site_name" content="WatermarkOut">
+  <meta property="og:locale" content="en_US">
+
+  <!-- ===== Twitter / X Card ===== -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="WatermarkOut — Free AI Watermark Remover">
+  <meta name="twitter:description" content="Remove watermarks from AI-generated images &amp; videos, entirely in your browser. Free, private, open source.">
+  <meta name="twitter:image" content="https://iamramgarhia.github.io/watermarkout-/assets/social-preview.png">
+  <meta name="twitter:image:alt" content="WatermarkOut interface showing watermark removal">
+
+  <!-- ===== JSON-LD structured data (Google Rich Results) ===== -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "WatermarkOut",
+    "applicationCategory": "MultimediaApplication",
+    "applicationSubCategory": "Photo Editor",
+    "operatingSystem": "Web Browser (Chrome, Edge, Firefox, Safari)",
+    "description": "Free AI-powered watermark remover for images and videos. Runs entirely in your browser using ONNX Runtime Web and the MI-GAN inpainting model. No uploads, no accounts, no cloud.",
+    "url": "https://iamramgarhia.github.io/watermarkout-/",
+    "image": "https://iamramgarhia.github.io/watermarkout-/assets/social-preview.png",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Prince Ramgarhia",
+      "url": "https://dicecodes.com",
+      "sameAs": [
+        "https://github.com/IamRamgarhia",
+        "https://dicecodes.com"
+      ]
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "DiceCodes",
+      "url": "https://dicecodes.com"
+    },
+    "softwareVersion": "1.0.0",
+    "featureList": [
+      "Remove watermarks from AI-generated images (Gemini, DALL-E, Midjourney, Adobe Firefly, Bing Image Creator)",
+      "Remove watermarks from short videos",
+      "Runs entirely in browser — no uploads",
+      "Works offline after first visit",
+      "Free and open source under MIT license"
+    ]
+  }
+  </script>
+
+  <!-- ===== Manifest, icons, fonts ===== -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="assets/logo-icon.svg">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap">
+
+  <link rel="stylesheet" href="css/app.css">
+
+  <!-- COI must register BEFORE any module — enables WASM threads + WebGPU -->
+  <script src="js/coi-bootstrap.js"></script>
+</head>
+<body class="app-page">
+
+  <!-- TOP NAV -->
+  <header class="topbar">
+    <div class="brand">
+      <img src="assets/logo-icon.svg" alt="" class="brand-icon">
+      <span class="brand-name">WatermarkOut</span>
+      <span class="badge" id="version-badge">v1.0.0</span>
+    </div>
+    <nav class="topnav">
+      <button class="nav-btn active" data-view="app">Editor</button>
+      <a class="nav-btn" href="about.html">About</a>
+      <span class="status-pill" id="status-pill">
+        <span class="status-dot" id="status-dot"></span>
+        <span id="status-text">Loading…</span>
+      </span>
+    </nav>
+  </header>
+
+  <!-- UPDATE BANNER -->
+  <div class="update-banner" id="update-banner" hidden>
+    <span>⚡ A new version of WatermarkOut is ready.</span>
+    <button class="btn-ghost btn-sm" id="btn-update">Reload to update</button>
+    <button class="btn-ghost btn-sm" id="btn-update-dismiss" aria-label="Dismiss">✕</button>
+  </div>
+
+  <!-- MODEL LOADER OVERLAY -->
+  <div class="model-loader" id="model-loader">
+    <div class="loader-card">
+      <img src="assets/logo.svg" alt="WatermarkOut" class="loader-logo">
+      <h2 id="loader-title">Looking for the AI model…</h2>
+      <p class="text-muted" id="loader-sub">Checking your device first — only downloads if it's not already here.</p>
+      <div class="progress-track">
+        <div class="progress-fill" id="loader-fill" style="width:0%"></div>
+        <div class="progress-shimmer"></div>
+      </div>
+      <p class="loader-meta" id="loader-meta">Checking…</p>
+      <p class="loader-tip text-muted" id="loader-backend"></p>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <main class="app-grid" id="app-grid" hidden>
+
+    <!-- LEFT SIDEBAR — all controls visible at all times -->
+    <aside class="sidebar">
+
+      <!-- File info -->
+      <div class="card" id="file-info-card">
+        <p class="label">FILE</p>
+        <p class="filename" id="file-name">No file loaded</p>
+        <div class="meta-row">
+          <span class="meta" id="file-dims">— × —</span>
+          <span class="meta" id="file-size">— MB</span>
+        </div>
+        <button class="btn-ghost btn-sm btn-full" id="btn-new-file" disabled>Replace file</button>
+      </div>
+
+      <!-- Quality -->
+      <div class="card" id="quality-card">
+        <p class="label">QUALITY</p>
+        <div class="radio-group">
+          <label><input type="radio" name="quality" value="fast"> <span>Fast</span></label>
+          <label><input type="radio" name="quality" value="balanced" checked> <span>Balanced</span></label>
+          <label><input type="radio" name="quality" value="best"> <span>Best Quality</span></label>
+        </div>
+
+        <p class="label">MASK EXPAND</p>
+        <input type="range" min="0" max="32" value="8" class="slider" id="mask-expand">
+        <span class="slider-value" id="mask-expand-val">8 px</span>
+
+        <p class="label" id="output-format-label">OUTPUT FORMAT</p>
+        <select class="select" id="output-format">
+          <!-- Populated dynamically based on file type -->
+        </select>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions" id="actions-card">
+        <button class="btn-primary btn-full" id="btn-remove" disabled>
+          <span class="btn-icon">✦</span> Remove watermark
+        </button>
+        <button class="btn-ghost btn-full" id="btn-download" disabled>
+          <span class="btn-icon">↓</span> Download result
+        </button>
+        <button class="btn-danger btn-full" id="btn-start-over" disabled title="Discard this file and start with a new one (Esc)">
+          <span class="btn-icon">🗑</span> Delete & start over
+        </button>
+      </div>
+
+
+
+      <!-- Privacy reminder -->
+      <div class="privacy-note">
+        <p>🔒 Your file never leaves this browser tab.</p>
+      </div>
+
+    </aside>
+
+    <!-- CANVAS / CONTENT -->
+    <section class="canvas-area">
+
+      <!-- DROPZONE (initial state) -->
+      <div class="dropzone" id="dropzone">
+        <div class="dropzone-inner">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <h2 class="dropzone-title">Drop an image or video to start</h2>
+          <p class="dropzone-sub">JPG, PNG, WEBP, BMP, MP4, WEBM, MOV — up to 100 MB</p>
+          <button class="btn-primary" id="btn-browse">Browse files</button>
+          <input type="file" id="file-input" accept="image/*,video/*" hidden>
+          <div class="dropzone-formats">
+            <span class="badge">JPG</span>
+            <span class="badge">PNG</span>
+            <span class="badge">WEBP</span>
+            <span class="badge">BMP</span>
+            <span class="badge">MP4</span>
+            <span class="badge">WEBM</span>
+            <span class="badge">MOV</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- EDITOR (after upload) -->
+      <div class="editor" id="editor" hidden>
+
+        <!-- Toolbar -->
+        <div class="toolbar">
+          <label class="tool-label">Watermark</label>
+          <select class="select select-toolbar" id="preset-select" title="Pick the watermark you want to remove for a pixel-perfect preset mask">
+            <option value="custom">Custom (draw yourself)</option>
+            <option value="gemini-br">Gemini (✨ bottom-right)</option>
+            <option value="gemini-bl">Gemini (✨ bottom-left)</option>
+            <option value="dalle-br">DALL·E (bottom-right tag)</option>
+            <option value="dalle-color-bar">DALL·E 2 (color bar bottom-right)</option>
+            <option value="bing-creator">Bing Image Creator (corner icon)</option>
+            <option value="firefly-br">Adobe Firefly (corner)</option>
+            <option value="midjourney-br">Midjourney (bottom-right)</option>
+            <option value="meta-ai">Meta AI (corner)</option>
+            <option value="stock-tile">Stock photo tiled grid</option>
+          </select>
+          <button class="tool-btn primary-tool" id="btn-apply-preset" title="Apply preset mask">
+            <span class="tool-icon">✨</span> Apply
+          </button>
+          <div class="separator"></div>
+          <button class="tool-btn active" data-tool="rect" title="Rectangle (R) — drag to refine">
+            <span class="tool-icon">▭</span> Rect
+          </button>
+          <button class="tool-btn" data-tool="brush" title="Brush (B)">
+            <span class="tool-icon">✏</span> Brush
+          </button>
+          <button class="tool-btn" data-tool="erase" title="Eraser (E) — remove from mask">
+            <span class="tool-icon">⌫</span> Erase
+          </button>
+          <div class="separator"></div>
+          <label class="tool-label">Size</label>
+          <input type="range" min="2" max="120" value="30" id="brush-size" class="slider slider-sm">
+          <span id="brush-size-val">30</span>
+          <div class="separator"></div>
+          <button class="tool-btn" id="btn-undo" title="Undo (Ctrl+Z)"><span class="tool-icon">↶</span></button>
+          <button class="tool-btn" id="btn-clear-mask" title="Clear mask">✕ Clear</button>
+          <div class="separator"></div>
+          <button class="tool-btn" id="btn-compare" title="Compare (Space)">⊟ Compare</button>
+          <button class="tool-btn" id="btn-zoom-fit" title="Fit">⤢ Fit</button>
+          <div class="ml-auto"></div>
+          <button class="tool-btn tool-danger" id="btn-delete-canvas" title="Delete this file and start over (Esc)">
+            <span class="tool-icon">🗑</span> Delete
+          </button>
+        </div>
+
+        <!-- Stage -->
+        <div class="stage" id="stage">
+          <div class="canvas-wrap" id="canvas-wrap">
+            <canvas id="canvas-image"></canvas>
+            <canvas id="canvas-result" hidden></canvas>
+            <canvas id="canvas-mask"></canvas>
+            <!-- Video playback elements (shown only when state.kind === 'video' and a result/original is being previewed) -->
+            <video id="video-original" hidden controls preload="auto"></video>
+            <video id="video-result" hidden controls preload="auto"></video>
+          </div>
+
+          <!-- BEFORE/AFTER tag for video preview -->
+          <div class="preview-label" id="preview-label" hidden></div>
+
+          <!-- Hint shown when no mask drawn yet -->
+          <div class="stage-hint" id="stage-hint">
+            <p>↑ Pick a watermark preset, or drag a rectangle</p>
+          </div>
+
+          <!-- HUGE PROCESSING OVERLAY -->
+          <div class="processing-overlay" id="processing-overlay" hidden>
+            <div class="processing-card">
+              <div class="spinner-large"></div>
+              <h3 id="processing-title">Removing watermark…</h3>
+              <p class="processing-sub" id="processing-sub">This usually takes 5–30 seconds.</p>
+              <div class="progress-track">
+                <div class="progress-fill" id="processing-fill" style="width:0%"></div>
+                <div class="progress-shimmer"></div>
+              </div>
+              <p class="processing-stage" id="processing-stage">Preparing…</p>
+            </div>
+          </div>
+
+          <!-- WARN MODAL — appears center-stage if user tries to remove without mask -->
+          <div class="stage-modal" id="stage-modal" hidden>
+            <div class="stage-modal-card">
+              <div class="stage-modal-icon" id="stage-modal-icon">⚠️</div>
+              <h3 id="stage-modal-title">Heads up</h3>
+              <p id="stage-modal-msg">Draw a rectangle around the watermark first.</p>
+              <button class="btn-primary" id="stage-modal-ok">OK, got it</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+  </main>
+
+  <!-- TOAST CONTAINER -->
+  <div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+
+  <!-- ONNX Runtime Web (loaded async). crossorigin needed under COI. -->
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js" crossorigin="anonymous"></script>
+
+  <!-- App modules -->
+  <script type="module" src="js/app.js"></script>
+
+</body>
+</html>

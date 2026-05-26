@@ -1,0 +1,38 @@
+# OS / IDE noise
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+.vs/
+*.swp
+*.swo
+*~
+
+# Logs and runtime cruft
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Node / build artifacts (we don't currently use any, but future-proof)
+node_modules/
+dist/
+.cache/
+.parcel-cache/
+
+# Models cached locally for development (browser fetches at runtime; not committed)
+static/models/*.onnx
+static/models/*.onnx.data
+
+# Local user data scratch
+uploads/
+outputs/
+results/
+
+# Editor backups
+*.bak
+*.tmp
+
+# Python bytecode (if anyone scripts something)
+__pycache__/
+*.py[cod]

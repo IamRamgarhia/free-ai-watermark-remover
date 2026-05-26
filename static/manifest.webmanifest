@@ -1,0 +1,48 @@
+{
+  "name": "WatermarkOut — Free AI Watermark Remover",
+  "short_name": "WatermarkOut",
+  "description": "Free AI watermark remover for images & videos. Runs entirely in your browser — no uploads, no accounts, no cloud. Open source.",
+  "start_url": "./",
+  "scope": "./",
+  "id": "watermarkout",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "background_color": "#09090b",
+  "theme_color": "#7c3aed",
+  "orientation": "any",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["graphics", "photo", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Remove a watermark",
+      "short_name": "Remove",
+      "url": "./",
+      "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "About",
+      "url": "./about.html"
+    }
+  ]
+}

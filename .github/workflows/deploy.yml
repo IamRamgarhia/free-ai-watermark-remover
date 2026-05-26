@@ -1,0 +1,39 @@
+# Auto-deploys the static/ folder to GitHub Pages on every push to main.
+#
+# After enabling this workflow:
+#   1. Repo Settings → Pages → Source: "GitHub Actions"
+#   2. Push to main
+#   3. App goes live at https://<username>.github.io/<repo>/
+#
+# Custom domain: put a CNAME file in static/ with your domain name.
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: static
+      - id: deployment
+        uses: actions/deploy-pages@v4

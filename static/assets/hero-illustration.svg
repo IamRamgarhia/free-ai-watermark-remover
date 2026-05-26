@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" width="1200" height="600">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#09090b"/>
+      <stop offset="100%" stop-color="#18181b"/>
+    </linearGradient>
+    <radialGradient id="glow1" cx="0.25" cy="0.35" r="0.5">
+      <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="0.78" cy="0.7" r="0.4">
+      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <pattern id="grain" patternUnits="userSpaceOnUse" width="3" height="3">
+      <rect width="3" height="3" fill="#0a0a0d"/>
+      <rect x="1" y="1" width="1" height="1" fill="#1c1c20" opacity="0.5"/>
+    </pattern>
+  </defs>
+
+  <!-- Layered background -->
+  <rect width="1200" height="600" fill="url(#bg)"/>
+  <rect width="1200" height="600" fill="url(#glow1)"/>
+  <rect width="1200" height="600" fill="url(#glow2)"/>
+  <rect width="1200" height="600" fill="url(#grain)" opacity="0.3"/>
+
+  <!-- App window mockup -->
+  <g transform="translate(80, 80)">
+    <!-- Window frame -->
+    <rect x="0" y="0" width="1040" height="440" rx="14" fill="#18181b" stroke="#27272a" stroke-width="1"/>
+    <!-- Window controls -->
+    <circle cx="22" cy="22" r="6" fill="#f87171"/>
+    <circle cx="42" cy="22" r="6" fill="#fb923c"/>
+    <circle cx="62" cy="22" r="6" fill="#4ade80"/>
+    <!-- Title -->
+    <text x="98" y="27" fill="#fafafa" font-family="Syne, sans-serif" font-weight="700" font-size="14">WatermarkOut</text>
+    <text x="220" y="27" fill="#7c3aed" font-family="DM Mono, monospace" font-size="10" letter-spacing="1.5">v1.0.0</text>
+
+    <!-- Top divider -->
+    <line x1="0" y1="48" x2="1040" y2="48" stroke="#27272a"/>
+
+    <!-- Sidebar -->
+    <rect x="0" y="48" width="260" height="392" fill="#0e0e10"/>
+    <line x1="260" y1="48" x2="260" y2="440" stroke="#27272a"/>
+
+    <!-- Sidebar cards -->
+    <g transform="translate(18, 72)">
+      <!-- File info -->
+      <rect width="224" height="84" rx="10" fill="#18181b" stroke="#27272a"/>
+      <text x="14" y="22" fill="#52525b" font-family="DM Mono, monospace" font-size="9" letter-spacing="1.5">FILE</text>
+      <text x="14" y="42" fill="#fafafa" font-family="DM Mono, monospace" font-size="11">image.png</text>
+      <text x="14" y="62" fill="#a1a1aa" font-family="DM Mono, monospace" font-size="9">1024 × 1024  ·  2.1 MB</text>
+
+      <!-- Quality card -->
+      <rect y="100" width="224" height="120" rx="10" fill="#18181b" stroke="#27272a"/>
+      <text x="14" y="122" fill="#52525b" font-family="DM Mono, monospace" font-size="9" letter-spacing="1.5">QUALITY</text>
+      <circle cx="24" cy="142" r="5" fill="none" stroke="#71717a"/>
+      <text x="38" y="146" fill="#a1a1aa" font-family="Syne, sans-serif" font-size="11">Fast</text>
+      <circle cx="24" cy="166" r="5" fill="#a78bfa"/>
+      <circle cx="24" cy="166" r="2.5" fill="#7c3aed"/>
+      <text x="38" y="170" fill="#fafafa" font-family="Syne, sans-serif" font-size="11">Balanced</text>
+      <circle cx="24" cy="190" r="5" fill="none" stroke="#71717a"/>
+      <text x="38" y="194" fill="#a1a1aa" font-family="Syne, sans-serif" font-size="11">Best Quality</text>
+
+      <!-- Buttons -->
+      <rect y="238" width="224" height="36" rx="8" fill="url(#accent)"/>
+      <text x="112" y="261" fill="#fff" font-family="Syne, sans-serif" font-weight="600" font-size="13" text-anchor="middle">✦ Remove watermark</text>
+
+      <rect y="284" width="224" height="32" rx="8" fill="transparent" stroke="#27272a"/>
+      <text x="112" y="305" fill="#a1a1aa" font-family="Syne, sans-serif" font-size="12" text-anchor="middle">↓ Download result</text>
+    </g>
+
+    <!-- Canvas area -->
+    <g transform="translate(260, 48)">
+      <!-- Toolbar -->
+      <rect width="780" height="48" fill="#0e0e10"/>
+      <line x1="0" y1="48" x2="780" y2="48" stroke="#27272a"/>
+
+      <!-- Toolbar tools -->
+      <rect x="16" y="12" width="80" height="24" rx="6" fill="#27272a" stroke="#a78bfa"/>
+      <text x="56" y="28" fill="#a78bfa" font-family="Syne, sans-serif" font-size="11" text-anchor="middle">▭ Rect</text>
+      <text x="120" y="28" fill="#a1a1aa" font-family="Syne, sans-serif" font-size="11">✏ Brush</text>
+      <text x="180" y="28" fill="#a1a1aa" font-family="Syne, sans-serif" font-size="11">⌫ Erase</text>
+
+      <!-- Stage with image mockup -->
+      <rect x="20" y="68" width="740" height="304" rx="8" fill="#0a0a0d"/>
+
+      <!-- Mock image: gradient with "watermark" highlighted -->
+      <defs>
+        <linearGradient id="mockImg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#fb923c"/>
+          <stop offset="50%" stop-color="#7c3aed"/>
+          <stop offset="100%" stop-color="#a78bfa"/>
+        </linearGradient>
+      </defs>
+      <rect x="120" y="90" width="540" height="260" rx="6" fill="url(#mockImg)" opacity="0.7"/>
+
+      <!-- Watermark mark being processed -->
+      <rect x="540" y="290" width="100" height="40" rx="6" fill="#ff40c0" opacity="0.6" stroke="#ff40c0" stroke-width="2" stroke-dasharray="6 4">
+        <animate attributeName="opacity" values="0.4;0.8;0.4" dur="2s" repeatCount="indefinite"/>
+      </rect>
+      <text x="590" y="316" fill="#fff" font-family="DM Mono, monospace" font-size="10" text-anchor="middle">remove</text>
+
+      <!-- Hint badge -->
+      <rect x="290" y="84" width="200" height="22" rx="11" fill="#09090b" stroke="#a78bfa" opacity="0.95"/>
+      <text x="390" y="99" fill="#fff" font-family="Syne, sans-serif" font-size="10" text-anchor="middle">↓ Drag a rectangle around the watermark</text>
+    </g>
+  </g>
+
+  <!-- Floating tagline below window -->
+  <text x="600" y="565" fill="#a1a1aa" font-family="Syne, sans-serif" font-size="16" text-anchor="middle" font-weight="500">
+    Free AI watermark remover · Runs in your browser · No uploads, ever
+  </text>
+</svg>
