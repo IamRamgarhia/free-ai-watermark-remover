@@ -12,10 +12,10 @@
 [![Made in India](https://img.shields.io/badge/Made%20in-India%20🇮🇳-orange?style=flat-square)]()
 [![PWA](https://img.shields.io/badge/Progressive%20Web%20App-7c3aed?style=flat-square&logo=pwa&logoColor=white)]()
 [![No telemetry](https://img.shields.io/badge/Telemetry-zero-success?style=flat-square)]()
-[![Stars](https://img.shields.io/github/stars/IamRamgarhia/watermarkout-?style=flat-square&color=yellow)](https://github.com/IamRamgarhia/watermarkout-/stargazers)
-[![Issues](https://img.shields.io/github/issues/IamRamgarhia/watermarkout-?style=flat-square)](https://github.com/IamRamgarhia/watermarkout-/issues)
+[![Stars](https://img.shields.io/github/stars/IamRamgarhia/free-ai-watermark-remover?style=flat-square&color=yellow)](https://github.com/IamRamgarhia/free-ai-watermark-remover/stargazers)
+[![Issues](https://img.shields.io/github/issues/IamRamgarhia/free-ai-watermark-remover?style=flat-square)](https://github.com/IamRamgarhia/free-ai-watermark-remover/issues)
 
-[🚀 **Try it live**](https://iamramgarhia.github.io/watermarkout-/) · [📥 Install Guide](INSTALL.md) · [💡 Why](#-why-it-exists) · [🛠 Deploy your own](#-deploy-your-own) · [🤝 Contribute](CONTRIBUTING.md)
+[🚀 **Try it live**](https://iamramgarhia.github.io/free-ai-watermark-remover/) · [📥 Install Guide](INSTALL.md) · [💡 Why](#-why-it-exists) · [🛠 Deploy your own](#-deploy-your-own) · [🤝 Contribute](CONTRIBUTING.md)
 
 <br>
 
@@ -35,7 +35,7 @@ There are **3 ways** to use WatermarkOut. Detailed steps for each in [**INSTALL.
 
 ### 1️⃣ Easiest: just open the link
 
-👉 **[https://iamramgarhia.github.io/watermarkout-/](https://iamramgarhia.github.io/watermarkout-/)**
+👉 **[https://iamramgarhia.github.io/free-ai-watermark-remover/](https://iamramgarhia.github.io/free-ai-watermark-remover/)**
 
 1. Open the link
 2. Drop in an image or video
@@ -54,8 +54,8 @@ Visit the URL → your browser shows an "Install" icon in the address bar → cl
 ### 3️⃣ Run locally (developers, offline forever, self-host)
 
 ```bash
-git clone https://github.com/IamRamgarhia/watermarkout-.git
-cd watermarkout-/static
+git clone https://github.com/IamRamgarhia/free-ai-watermark-remover.git
+cd free-ai-watermark-remover/static
 python -m http.server 8000
 # Open http://localhost:8000
 ```

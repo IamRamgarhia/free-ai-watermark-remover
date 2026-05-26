@@ -1,6 +1,6 @@
 # GitHub Setup Guide — what to put where
 
-Copy-paste this when configuring your `IamRamgarhia/watermarkout-` repo for maximum SEO + discoverability.
+Copy-paste this when configuring your `IamRamgarhia/free-ai-watermark-remover` repo for maximum SEO + discoverability.
 
 ---
 
@@ -17,7 +17,7 @@ Copy-paste this when configuring your `IamRamgarhia/watermarkout-` repo for maxi
 ## 2. Website URL (right under the description)
 
 ```
-https://iamramgarhia.github.io/watermarkout-/
+https://iamramgarhia.github.io/free-ai-watermark-remover/
 ```
 
 ---
@@ -81,7 +81,7 @@ If you want a fancier image, design one with:
 After the first deploy completes (check the Actions tab), your live URL is:
 
 ```
-https://iamramgarhia.github.io/watermarkout-/
+https://iamramgarhia.github.io/free-ai-watermark-remover/
 ```
 
 ### Custom domain (optional)
@@ -104,8 +104,8 @@ Your README has these dynamic badges:
 |---|---|
 | ![License](https://img.shields.io/badge/License-MIT-success.svg?style=flat-square) | MIT license |
 | ![PWA](https://img.shields.io/badge/Progressive%20Web%20App-7c3aed?style=flat-square) | PWA |
-| ![Stars](https://img.shields.io/github/stars/IamRamgarhia/watermarkout-?style=flat-square) | Live star count |
-| ![Issues](https://img.shields.io/github/issues/IamRamgarhia/watermarkout-?style=flat-square) | Open issues |
+| ![Stars](https://img.shields.io/github/stars/IamRamgarhia/free-ai-watermark-remover?style=flat-square) | Live star count |
+| ![Issues](https://img.shields.io/github/issues/IamRamgarhia/free-ai-watermark-remover?style=flat-square) | Open issues |
 
 They auto-update from GitHub.
 
@@ -113,7 +113,7 @@ They auto-update from GitHub.
 
 ## 7. Pin this repo to your profile
 
-Go to your profile **https://github.com/IamRamgarhia** → click "Customize your pins" → check `watermarkout-`. Now it shows on your profile page.
+Go to your profile **https://github.com/IamRamgarhia** → click "Customize your pins" → check `free-ai-watermark-remover`. Now it shows on your profile page.
 
 ---
 
@@ -146,7 +146,7 @@ First public release.
 - ONNX Runtime Web with WebGPU → WebGL → WASM fallback
 - Cross-origin isolation via Service Worker (enables WASM threads + SIMD)
 
-📥 **Try it:** https://iamramgarhia.github.io/watermarkout-/
+📥 **Try it:** https://iamramgarhia.github.io/free-ai-watermark-remover/
 ```
 
 ---
@@ -177,8 +177,8 @@ After deployment, submit your site to:
 
 ### Ping search engines (optional speedup)
 ```
-https://www.google.com/ping?sitemap=https://iamramgarhia.github.io/watermarkout-/sitemap.xml
-https://www.bing.com/ping?sitemap=https://iamramgarhia.github.io/watermarkout-/sitemap.xml
+https://www.google.com/ping?sitemap=https://iamramgarhia.github.io/free-ai-watermark-remover/sitemap.xml
+https://www.bing.com/ping?sitemap=https://iamramgarhia.github.io/free-ai-watermark-remover/sitemap.xml
 ```
 
 ---
@@ -241,7 +241,7 @@ git init
 git add .
 git commit -m "Initial commit: WatermarkOut v1.0.0"
 git branch -M main
-git remote add origin https://github.com/IamRamgarhia/watermarkout-.git
+git remote add origin https://github.com/IamRamgarhia/free-ai-watermark-remover.git
 git push -u origin main
 
 # Tag the first release

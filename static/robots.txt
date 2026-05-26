@@ -4,4 +4,4 @@ Allow: /
 # We want indexing of everything — there is no private content.
 # The AI model file is hosted externally; nothing to hide here.
 
-Sitemap: https://iamramgarhia.github.io/watermarkout-/sitemap.xml
+Sitemap: https://iamramgarhia.github.io/free-ai-watermark-remover/sitemap.xml

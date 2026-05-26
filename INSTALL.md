@@ -14,7 +14,7 @@ WatermarkOut has **three** ways to install/use it. Pick the one that fits you.
 
 Just open the link. The app loads, downloads the AI model once (~29 MB), and works fully offline after that.
 
-👉 **https://iamramgarhia.github.io/watermarkout-/**
+👉 **https://iamramgarhia.github.io/free-ai-watermark-remover/**
 
 Done. No accounts. No download. Nothing to install.
 
@@ -26,7 +26,7 @@ This is the **easiest way to get a "desktop app" feel** without downloading anyt
 
 ### Windows (Chrome / Edge / Brave / Opera)
 
-1. Open https://iamramgarhia.github.io/watermarkout-/ in your browser
+1. Open https://iamramgarhia.github.io/free-ai-watermark-remover/ in your browser
 2. Look for the **install icon** in the address bar — it looks like a monitor with an arrow ⤓ or just `+`
 3. Click it → **Install**
 4. WatermarkOut now appears:
@@ -94,8 +94,8 @@ For people who want to:
 Open a terminal (Command Prompt / PowerShell / Terminal):
 
 ```bash
-git clone https://github.com/IamRamgarhia/watermarkout-.git
-cd watermarkout-
+git clone https://github.com/IamRamgarhia/free-ai-watermark-remover.git
+cd free-ai-watermark-remover
 ```
 
 You should now see the project files. Verify with `ls` (Mac/Linux) or `dir` (Windows).
@@ -165,7 +165,7 @@ In the terminal, press **`Ctrl + C`**.
 
 To restart later:
 ```bash
-cd watermarkout-/static
+cd free-ai-watermark-remover/static
 python -m http.server 8000
 ```
 
@@ -255,5 +255,5 @@ This means the Service Worker didn't take over the page. Hard-refresh (`Ctrl + S
 
 - 📖 Full docs: [README.md](README.md)
 - 🤝 Want to contribute? [CONTRIBUTING.md](CONTRIBUTING.md)
-- 🐛 Found a bug? [Open an issue](https://github.com/IamRamgarhia/watermarkout-/issues)
+- 🐛 Found a bug? [Open an issue](https://github.com/IamRamgarhia/free-ai-watermark-remover/issues)
 - 💬 Contact: Contact@dicecodes.com

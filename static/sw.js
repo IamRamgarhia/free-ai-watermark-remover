@@ -10,7 +10,7 @@
  * The LaMa model is NOT cached here — it lives in IndexedDB (see model-cache.js).
  */
 
-const CACHE_VERSION = 'watermarkout-v2.0.9';
+const CACHE_VERSION = 'watermarkout-v2.1.0';
 
 const APP_SHELL = [
   './',
