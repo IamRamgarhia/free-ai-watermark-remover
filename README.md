@@ -15,7 +15,7 @@
 [![Stars](https://img.shields.io/github/stars/IamRamgarhia/watermarkout-?style=flat-square&color=yellow)](https://github.com/IamRamgarhia/watermarkout-/stargazers)
 [![Issues](https://img.shields.io/github/issues/IamRamgarhia/watermarkout-?style=flat-square)](https://github.com/IamRamgarhia/watermarkout-/issues)
 
-[🚀 **Try it live**](https://iamramgarhia.github.io/watermarkout-/) · [📖 Docs](#-quick-start) · [💡 Why](#-why-it-exists) · [🛠 Deploy your own](#-deploy-your-own) · [🤝 Contribute](CONTRIBUTING.md)
+[🚀 **Try it live**](https://iamramgarhia.github.io/watermarkout-/) · [📥 Install Guide](INSTALL.md) · [💡 Why](#-why-it-exists) · [🛠 Deploy your own](#-deploy-your-own) · [🤝 Contribute](CONTRIBUTING.md)
 
 <br>
 
@@ -31,7 +31,9 @@ WatermarkOut removes watermarks from AI-generated images (**Gemini**, **DALL·E*
 
 ## 🚀 Quick start
 
-### Use it instantly (no install)
+There are **3 ways** to use WatermarkOut. Detailed steps for each in [**INSTALL.md**](INSTALL.md).
+
+### 1️⃣ Easiest: just open the link
 
 👉 **[https://iamramgarhia.github.io/watermarkout-/](https://iamramgarhia.github.io/watermarkout-/)**
 
@@ -43,13 +45,24 @@ WatermarkOut removes watermarks from AI-generated images (**Gemini**, **DALL·E*
 
 That's it. The file never left your browser.
 
-### Install as an app
+### 2️⃣ Install as a real desktop app (PWA)
 
-Modern browsers detect the PWA manifest and offer to "Install" the app — adds a real desktop icon, opens in its own window, works offline.
+Visit the URL → your browser shows an "Install" icon in the address bar → click it → **WatermarkOut now has a real desktop icon and opens in its own window**. Works on Windows, macOS, Linux, iOS, Android. Zero downloads from any app store.
 
-- **Chrome / Edge desktop**: click the install icon in the address bar
-- **Safari iOS**: Share → Add to Home Screen
-- **Android Chrome**: ⋮ menu → Install app
+[📥 Full install steps per OS in INSTALL.md →](INSTALL.md#b-install-as-a-progressive-web-app-pwa--gets-a-real-desktop-icon)
+
+### 3️⃣ Run locally (developers, offline forever, self-host)
+
+```bash
+git clone https://github.com/IamRamgarhia/watermarkout-.git
+cd watermarkout-/static
+python -m http.server 8000
+# Open http://localhost:8000
+```
+
+No build step. No npm install. No compilation. Just static files.
+
+[📥 Step-by-step in INSTALL.md →](INSTALL.md#c-run-it-locally-on-your-machine-developers-offline-forever-self-host)
 
 ---
 
