@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Help — FreeHub Pro Watermark Remover</title>
+  <meta name="description" content="Help and frequently asked questions for FreeHub Pro Watermark Remover.">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/about.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="assets/logo-icon.svg" alt="" class="brand-icon">
+      <span class="brand-name">FreeHub Pro</span>
+    </div>
+    <nav class="topnav">
+      <a class="nav-btn" href="index.html">Editor</a>
+      <a class="nav-btn" href="about.html">About</a>
+      <a class="nav-btn active" href="help.html">Help</a>
+      <a class="nav-btn" href="legal.html">Legal</a>
+      <a class="nav-btn" href="license.html">License</a>
+      <a class="nav-btn" href="privacy.html">Privacy</a>
+    </nav>
+  </header>
+
+  <main class="about-page">
+    <section class="about-hero">
+      <h1 class="about-title">Help</h1>
+      <p class="about-tagline">Common questions, answered plainly.</p>
+    </section>
+
+    <div class="mt-8 flex flex-col gap-6">
+      <section class="panel p-4 about-card">
+        <h2 class="font-display text-base font-semibold text-paper">How do I remove a watermark?</h2>
+        <p class="mt-1.5 text-sm text-muted">Drop in an image or short clip, paint over the watermark (or choose a preset for common corner marks), then click <strong>Remove watermark</strong>. Download the result when it finishes.</p>
+      </section>
+
+      <section class="panel p-4 about-card">
+        <h2 class="font-display text-base font-semibold text-paper">Why is the first run slow?</h2>
+        <p class="mt-1.5 text-sm text-muted">The AI model (~29 MB) downloads once and is cached on your device. Subsequent runs are fast and can work offline.</p>
+      </section>
+
+      <section class="panel p-4 about-card">
+        <h2 class="font-display text-base font-semibold text-paper">Does my file get uploaded anywhere?</h2>
+        <p class="mt-1.5 text-sm text-muted">Not by default — the app runs in your browser tab and your files stay local. An optional cloud-quality mode (images only) will send the image to a processing function; it is not stored afterward.</p>
+      </section>
+
+      <section class="panel p-4 about-card">
+        <h2 class="font-display text-base font-semibold text-paper">My video watermark still shows partway through the clip.</h2>
+        <p class="mt-1.5 text-sm text-muted">Video mode only removes a watermark that stays in a fixed position throughout the clip. If the mark moves, appears partway through, or the camera pans, it won't be tracked.</p>
+      </section>
+
+      <section class="panel p-4 about-card">
+        <h2 class="font-display text-base font-semibold text-paper">The result looks blurry or smudged.</h2>
+        <p class="mt-1.5 text-sm text-muted">Try painting a tighter mask around the watermark. The less the model has to invent, the cleaner the result. Complex backgrounds (faces, fine text, patterns) remain challenging for inpainting models.</p>
+      </section>
+
+      <section class="panel p-4 about-card">
+        <h2 class="font-display text-base font-semibold text-paper">What file types and sizes are supported?</h2>
+        <p class="mt-1.5 text-sm text-muted">Images: JPG, PNG, WEBP, BMP. Videos: MP4, WEBM, MOV. Files up to ~100 MB; video works best under ~30 seconds.</p>
+      </section>
+
+      <section class="panel p-4 about-card">
+        <h2 class="font-display text-base font-semibold text-paper">Nothing happens when I click Remove watermark.</h2>
+        <p class="mt-1.5 text-sm text-muted">The button remains disabled until a mask is drawn. If it still doesn't respond, ensure your browser supports WebAssembly and Service Workers (recent Chrome, Edge, Firefox, or Safari 16.4+).</p>
+      </section>
+
+      <section class="panel p-4 about-card">
+        <h2 class="font-display text-base font-semibold text-paper">Can I use this on content I don't own?</h2>
+        <p class="mt-1.5 text-sm text-muted">No — use this tool only on files you own or have permission to edit. See the Legal page for details.</p>
+      </section>
+
+      <section class="panel p-4 about-card">
+        <h2 class="font-display text-base font-semibold text-paper">Still stuck?</h2>
+        <p class="mt-1.5 text-sm text-muted">Contact: <a href="mailto:freehubpro001@gmail.com">freehubpro001@gmail.com</a> — this is the primary contact for the app.</p>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

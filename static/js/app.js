@@ -1,5 +1,5 @@
 /**
- * WatermarkOut — Main controller.
+ * FreeHub Pro — Main controller.
  * Wires together upload, mask drawing, inpainter, downloads, and PWA registration.
  */
 

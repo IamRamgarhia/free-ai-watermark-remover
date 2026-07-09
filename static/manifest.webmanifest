@@ -1,6 +1,6 @@
 {
-  "name": "WatermarkOut — Free AI Watermark Remover",
-  "short_name": "WatermarkOut",
+  "name": "FreeHub Pro Watermark Remover",
+  "short_name": "FreeHub Pro",
   "description": "Free AI watermark remover for images & videos. Runs entirely in your browser — no uploads, no accounts, no cloud. Open source.",
   "start_url": "./",
   "scope": "./",

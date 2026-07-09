@@ -1,5 +1,5 @@
 /**
- * WatermarkOut Service Worker — does TWO jobs:
+ * FreeHub Pro Service Worker — does TWO jobs:
  *
  *   1. App shell caching (offline support, instant repeat loads).
  *   2. Cross-Origin-Isolation header injection so WebAssembly can use
@@ -7,15 +7,19 @@
  *      falls back to single-threaded WASM (~10× slower).
  *
  * Bump CACHE_VERSION on every release. Old caches are auto-deleted.
- * The LaMa model is NOT cached here — it lives in IndexedDB (see model-cache.js).
+ * The MI-GAN model is NOT cached here — it lives in IndexedDB (see model-cache.js).
  */
 
-const CACHE_VERSION = 'watermarkout-v2.1.0';
+const CACHE_VERSION = 'freehub-pro-v2.1.0';
 
 const APP_SHELL = [
   './',
   './index.html',
   './about.html',
+  './help.html',
+  './legal.html',
+  './license.html',
+  './privacy.html',
   './offline.html',
   './manifest.webmanifest',
   './css/app.css',

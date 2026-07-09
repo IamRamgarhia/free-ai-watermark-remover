@@ -1,4 +1,4 @@
-# WatermarkOut — Technical Architecture
+# FreeHub Pro — Technical Architecture
 
 > Authoritative spec of how the app is built today. Companion to the user-facing [README](README.md).
 
@@ -220,7 +220,7 @@ Cross-Origin-Resource-Policy: cross-origin
 | File | Lines | Role |
 |---|---|---|
 | `index.html` | ~270 | App shell + DOM scaffolding |
-| `about.html` | ~165 | About page (DiceCodes branding) |
+| `about.html` | ~165 | About page (FreeHub Pro branding) |
 | `offline.html` | ~22 | Fallback when SW + cache miss |
 | `sw.js` | ~110 | Service Worker: app cache + COI header injection |
 | `manifest.webmanifest` | ~50 | PWA manifest for installability |

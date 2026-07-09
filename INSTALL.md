@@ -1,6 +1,6 @@
 # Installation guide
 
-WatermarkOut has **three** ways to install/use it. Pick the one that fits you.
+FreeHub Pro has **three** ways to install/use it. Pick the one that fits you.
 
 | Path | For who | Time | Internet needed |
 |---|---|---|---|
@@ -18,7 +18,6 @@ Just open the link. The app loads, downloads the AI model once (~29 MB), and wor
 
 Done. No accounts. No download. Nothing to install.
 
----
 
 ## B. Install as a Progressive Web App (PWA) — gets a real desktop icon
 
@@ -29,7 +28,7 @@ This is the **easiest way to get a "desktop app" feel** without downloading anyt
 1. Open https://iamramgarhia.github.io/free-ai-watermark-remover/ in your browser
 2. Look for the **install icon** in the address bar — it looks like a monitor with an arrow ⤓ or just `+`
 3. Click it → **Install**
-4. WatermarkOut now appears:
+4. FreeHub Pro now appears:
    - As a **desktop icon** (double-click to launch)
    - In your **Start menu**
    - In the **taskbar** when running
@@ -40,7 +39,7 @@ This is the **easiest way to get a "desktop app" feel** without downloading anyt
 **Chrome / Edge:**
 1. Open the URL
 2. Click the **install icon** in the address bar (right side)
-3. Click **Install** → WatermarkOut.app appears in `/Applications`
+3. Click **Install** → FreeHub Pro.app appears in `/Applications`
 
 **Safari 17+:**
 1. Open the URL
@@ -53,7 +52,7 @@ This is the **easiest way to get a "desktop app" feel** without downloading anyt
 2. Tap the **Share** button (⬆ box icon)
 3. Tap **Add to Home Screen**
 4. Tap **Add** in the top-right
-5. WatermarkOut now has a real app icon on your home screen
+5. FreeHub Pro now has a real app icon on your home screen
 
 ### Android (Chrome)
 
@@ -71,7 +70,6 @@ This is the **easiest way to get a "desktop app" feel** without downloading anyt
 ✅ Auto-updates when we push a new version
 ✅ No App Store, no Play Store, no permissions, no tracking
 
----
 
 ## C. Run it locally on your machine (developers, offline forever, self-host)
 
@@ -146,7 +144,7 @@ The app loads. **On the first run**, the browser fetches the 29 MB MI-GAN AI mod
 
 ### Step 4 (optional): Pre-cache the model for fully-offline use
 
-If you want to use WatermarkOut even without internet (e.g., on a plane, secure environment):
+If you want to use FreeHub Pro even without internet (e.g., on a plane, secure environment):
 
 1. Run Step 3 once with internet → wait for "Found it on your device" status
 2. The model is now in your browser's IndexedDB (cached on disk)
@@ -169,7 +167,6 @@ cd free-ai-watermark-remover/static
 python -m http.server 8000
 ```
 
----
 
 ## Self-hosting (production)
 
@@ -199,7 +196,6 @@ Upload the contents of `static/` to any HTTP server (Apache, Nginx, S3+CloudFron
 
 **Important for self-hosting:** the Service Worker needs to be served from the root of your site (or app scope). If you serve from a subpath (e.g. `example.com/watermarkout/`), all paths in `manifest.webmanifest` and HTML already use relative URLs — no changes needed.
 
----
 
 ## System requirements
 
@@ -217,7 +213,6 @@ Upload the contents of `static/` to any HTTP server (Apache, Nginx, S3+CloudFron
 - ❌ Any paid service
 - ❌ Any account anywhere
 
----
 
 ## Troubleshooting
 
@@ -249,11 +244,10 @@ This means the Service Worker didn't take over the page. Hard-refresh (`Ctrl + S
 - **Application tab → Service Workers** — verify the worker is active
 - **Application tab → IndexedDB → watermarkout** — see the cached model file
 
----
 
 ## Questions?
 
 - 📖 Full docs: [README.md](README.md)
 - 🤝 Want to contribute? [CONTRIBUTING.md](CONTRIBUTING.md)
 - 🐛 Found a bug? [Open an issue](https://github.com/IamRamgarhia/free-ai-watermark-remover/issues)
-- 💬 Contact: Contact@dicecodes.com
+- 💬 Contact: freehubpro001@gmail.com
