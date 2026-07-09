@@ -38,7 +38,7 @@
     <circle cx="42" cy="22" r="6" fill="#fb923c"/>
     <circle cx="62" cy="22" r="6" fill="#4ade80"/>
     <!-- Title -->
-    <text x="98" y="27" fill="#fafafa" font-family="Syne, sans-serif" font-weight="700" font-size="14">WatermarkOut</text>
+    <text x="98" y="27" fill="#fafafa" font-family="Syne, sans-serif" font-weight="700" font-size="14">FreeHub Pro</text>
     <text x="220" y="27" fill="#7c3aed" font-family="DM Mono, monospace" font-size="10" letter-spacing="1.5">v1.0.0</text>
 
     <!-- Top divider -->

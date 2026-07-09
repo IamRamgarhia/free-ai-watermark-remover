@@ -12,6 +12,6 @@
   <path d="M16 40 L56 40" stroke="#fafafa" stroke-width="2.5" stroke-linecap="round" opacity="0.85"/>
 
   <!-- Wordmark -->
-  <text x="86" y="50" font-family="Syne, Segoe UI, sans-serif" font-size="32" font-weight="800"
-        fill="#fafafa" letter-spacing="-1">WatermarkOut</text>
+  <text x="86" y="50" font-family="Syne, Segoe UI, sans-serif" font-size="24" font-weight="800"
+        fill="#fafafa" letter-spacing="-1">FreeHub Pro</text>
 </svg>

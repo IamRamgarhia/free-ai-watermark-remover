@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="static/assets/logo.svg" alt="WatermarkOut" width="380"/>
+# <img src="static/assets/logo.svg" alt="FreeHub Pro" width="380"/>
 
-# WatermarkOut
+# FreeHub Pro
 
 ### The only watermark remover you'll never have to pay for.
 
@@ -19,19 +19,19 @@
 
 <br>
 
-<img src="static/assets/hero-illustration.svg" alt="WatermarkOut app interface preview" width="100%"/>
+<img src="static/assets/hero-illustration.svg" alt="FreeHub Pro app interface preview" width="100%"/>
 
 </div>
 
 ---
 
-WatermarkOut removes watermarks from AI-generated images (**Gemini**, **DALL·E**, **Midjourney**, **Bing Image Creator**, **Adobe Firefly**, **Meta AI**) and short videos — **entirely client-side**. The AI model runs in your browser via WebAssembly. Your files never touch any server. There is no server.
+FreeHub Pro removes watermarks from AI-generated images (**Gemini**, **DALL·E**, **Midjourney**, **Bing Image Creator**, **Adobe Firefly**, **Meta AI**) and short videos — **entirely client-side**. The AI model runs in your browser via WebAssembly. Your files never touch any server. There is no server.
 
 ---
 
 ## 🚀 Quick start
 
-There are **3 ways** to use WatermarkOut. Detailed steps for each in [**INSTALL.md**](INSTALL.md).
+There are **3 ways** to use FreeHub Pro. Detailed steps for each in [**INSTALL.md**](INSTALL.md).
 
 ### 1️⃣ Easiest: just open the link
 
@@ -47,7 +47,7 @@ That's it. The file never left your browser.
 
 ### 2️⃣ Install as a real desktop app (PWA)
 
-Visit the URL → your browser shows an "Install" icon in the address bar → click it → **WatermarkOut now has a real desktop icon and opens in its own window**. Works on Windows, macOS, Linux, iOS, Android. Zero downloads from any app store.
+Visit the URL → your browser shows an "Install" icon in the address bar → click it → **FreeHub Pro now has a real desktop icon and opens in its own window**. Works on Windows, macOS, Linux, iOS, Android. Zero downloads from any app store.
 
 [📥 Full install steps per OS in INSTALL.md →](INSTALL.md#b-install-as-a-progressive-web-app-pwa--gets-a-real-desktop-icon)
 
@@ -68,7 +68,7 @@ No build step. No npm install. No compilation. Just static files.
 
 ## 💡 Why it exists
 
-Online watermark removers charge ₹800–₹2,500 / month ($10–$30), upload your private photos to unknown servers, and add their own watermark on the free tier. WatermarkOut runs the AI **inside your browser tab** — verifiable in DevTools (Network tab stays empty after first load).
+Online watermark removers charge ₹800–₹2,500 / month ($10–$30), upload your private photos to unknown servers, and add their own watermark on the free tier. FreeHub Pro runs the AI **inside your browser tab** — verifiable in DevTools (Network tab stays empty after first load).
 
 - ✅ Free forever — costs $0 to host on GitHub Pages
 - ✅ Open source under MIT — fork, audit, modify
@@ -79,21 +79,21 @@ Online watermark removers charge ₹800–₹2,500 / month ($10–$30), upload y
 
 ## ✨ Features
 
-| | |
-|---|---|
-| 🖼 Image watermark removal | JPG, PNG, WEBP, BMP — up to 100 MB |
-| 🎬 Video watermark removal | MP4, WEBM, MOV — audio preserved, real-time playback preview |
-| 🤖 MI-GAN inpainting | Picsart Research ICCV 2023 model, 29 MB |
-| ✨ Watermark presets | Gemini, DALL·E, Midjourney, Bing, Firefly, Meta AI |
-| 🎨 Manual masking | Rectangle, brush, eraser, undo |
-| 🔄 BEFORE/AFTER compare | Toggle to see original vs cleaned |
-| 🔒 100% offline AI | After first load, zero outbound requests |
-| 📱 Installable PWA | Desktop icon, standalone window, offline support |
-
----
-
-## 🖥 System requirements
-
+```
+free-ai-watermark-remover/
+├── README.md
+├── LICENSE
+├── CONTRIBUTING.md
+├── WATERMARKOUT_BUILD_SPEC.md
+├── .gitignore
+└── static/                  ← deploy this folder
+  ├── index.html           main app
+  ├── about.html           about page (FreeHub Pro branding)
+  ├── offline.html         shown when offline & uncached
+  ├── manifest.webmanifest PWA manifest
+  ├── sw.js                Service Worker (offline + COI headers)
+  ├── css/
+```
 - Any browser supporting WebAssembly + Service Workers:
   - Chrome / Edge 90+
   - Firefox 90+
@@ -155,7 +155,7 @@ Connect the repo, set the publish directory to `static/`, deploy. All free for s
 
 ### Custom domain
 
-1. Create a `CNAME` file in `static/` containing your domain (e.g. `watermarkout.dicecodes.com`).
+1. Create a `CNAME` file in `static/` containing your domain (e.g. `freehubpro.example.com`).
 2. Add a DNS CNAME record pointing to `<username>.github.io`.
 3. Free HTTPS is auto-provisioned by GitHub Pages.
 
@@ -254,15 +254,13 @@ watermarkout/
 
 ## 👨‍💻 About the maker
 
-Built solo by **Prince Ramgarhia** (DiceCodes) in Batala, Punjab 🇮🇳.
+Built by **Chaitanya Lalit Patil**.
 
-> Solo-built. No VC. No growth team. Just one developer trying to make pro-grade creative tooling permanently free for everyone.
+> Solo-built. No VC. No growth team. One developer building a small, private-first tool to help creators.
 
-- 🌐 [dicecodes.com](https://dicecodes.com)
-- 📧 [Contact@dicecodes.com](mailto:Contact@dicecodes.com)
-- 🐙 [@IamRamgarhia](https://github.com/IamRamgarhia)
+- 📧 freehubpro001@gmail.com
 
-### Other free tools by DiceCodes
+### Other free tools
 
 - [Free GST Billing Software](https://github.com/IamRamgarhia/Free-GST-Billing-Software)
 - [SEO Tool](https://github.com/IamRamgarhia/SEO-Tool)
@@ -270,7 +268,7 @@ Built solo by **Prince Ramgarhia** (DiceCodes) in Batala, Punjab 🇮🇳.
 
 ### Support
 
-If WatermarkOut saved you money, time, or a privacy headache:
+If FreeHub Pro saved you money, time, or a privacy headache:
 
 - **UPI (India):** `princeramgarhiaa-1@okaxis`
 - **GitHub Sponsors:** [github.com/sponsors/IamRamgarhia](https://github.com/sponsors/IamRamgarhia)

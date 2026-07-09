@@ -1,14 +1,14 @@
-# Contributing to WatermarkOut
+# Contributing to FreeHub Pro
 
-Thanks for considering a contribution! WatermarkOut is a solo project, but pull requests, issues, and ideas are very welcome.
+Thanks for considering a contribution! FreeHub Pro is a solo project, but pull requests, issues, and ideas are very welcome.
 
 ## Quick setup
 
 There is **no build step**. The app is pure vanilla HTML + CSS + JavaScript. To develop locally:
 
 ```bash
-git clone https://github.com/IamRamgarhia/watermarkout.git
-cd watermarkout/static
+git clone https://github.com/IamRamgarhia/free-ai-watermark-remover.git
+cd free-ai-watermark-remover/static
 python -m http.server 8000
 # Open http://localhost:8000
 ```

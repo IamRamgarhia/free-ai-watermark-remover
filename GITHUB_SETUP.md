@@ -86,11 +86,11 @@ https://iamramgarhia.github.io/free-ai-watermark-remover/
 
 ### Custom domain (optional)
 
-1. Rename `static/CNAME.example` → `static/CNAME`, edit to your domain (e.g. `watermarkout.dicecodes.com`).
+1. Rename `static/CNAME.example` → `static/CNAME`, edit to your domain (e.g. `freehubpro.example.com`).
 2. **Settings → Pages → Custom domain:** type the same domain, save.
 3. Add a DNS CNAME record at your registrar:
    ```
-   watermarkout.dicecodes.com → iamramgarhia.github.io
+   freehubpro.example.com → iamramgarhia.github.io
    ```
 4. Wait ~5 min for HTTPS to provision (free, automatic).
 
@@ -129,7 +129,7 @@ git push origin v1.0.0
 Then **Releases → Draft a new release**:
 
 - **Tag:** `v1.0.0`
-- **Title:** `WatermarkOut v1.0.0 — first release`
+- **Title:** `FreeHub Pro v1.0.0 — first release`
 - **Description:**
 ```markdown
 First public release.
@@ -195,7 +195,7 @@ This already works with the `manifest.webmanifest` I included. When users visit 
 | **Brave / Opera / Arc** | Same as Chrome/Edge |
 
 The installed app:
-- Has the WatermarkOut icon on desktop / home screen
+- Has the FreeHub Pro icon on desktop / home screen
 - Opens in its own standalone window (no browser tab UI)
 - Works fully offline (after first visit)
 - Auto-updates when you push a new version (via Service Worker)
@@ -220,7 +220,7 @@ Once live, verify in this order:
 
 These give your repo authoritative backlinks:
 
-- **Show HN (Hacker News):** post `Show HN: WatermarkOut – browser-based AI watermark remover`
+- **Show HN (Hacker News):** post `Show HN: FreeHub Pro – browser-based AI watermark remover`
 - **Reddit:** r/InternetIsBeautiful, r/SideProject, r/StableDiffusion, r/javascript
 - **X (Twitter):** post the GitHub link with screenshots
 - **Product Hunt:** schedule a launch
@@ -239,7 +239,7 @@ Every external link to your GitHub URL helps it rank.
 cd "d:/calude/watermark"
 git init
 git add .
-git commit -m "Initial commit: WatermarkOut v1.0.0"
+git commit -m "Initial commit: FreeHub Pro v1.0.0"
 git branch -M main
 git remote add origin https://github.com/IamRamgarhia/free-ai-watermark-remover.git
 git push -u origin main
