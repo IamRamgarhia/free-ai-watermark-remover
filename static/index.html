@@ -4,6 +4,36 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
+  <!-- ===== Content Security Policy =====
+       Defence-in-depth: the ONNX runtime (jsDelivr) and the model (HuggingFace)
+       both come from third parties, so this pins exactly which origins the page
+       may load code and data from. Notes on the non-obvious bits:
+         'wasm-unsafe-eval' — required to compile the ONNX WebAssembly.
+         script-src blob:   — ORT runs inference in a Worker it builds at runtime
+                              (ort.env.wasm.proxy), and that worker dynamically
+                              import()s a blob URL. Dropping blob: here makes the
+                              WASM backend fail outright with "Failed to fetch
+                              dynamically imported module" — verified, not guessed.
+                              worker-src alone does NOT cover that import.
+         style-src unsafe-inline — inline style attributes (progress bar widths).
+                                   Scripts do NOT get unsafe-inline.
+         connect-src hf.co  — HuggingFace redirects model downloads to CDN subdomains.
+       frame-ancestors is not valid in a meta tag; sw.js sets it as a real header. -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    base-uri 'self';
+    object-src 'none';
+    form-action 'none';
+    script-src 'self' blob: 'wasm-unsafe-eval' https://cdn.jsdelivr.net;
+    worker-src 'self' blob:;
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    font-src 'self' https://fonts.gstatic.com;
+    img-src 'self' data: blob:;
+    media-src 'self' blob:;
+    manifest-src 'self';
+    connect-src 'self' blob: data: https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co;
+  ">
+
   <!-- ===== Primary SEO meta ===== -->
   <title>WatermarkOut — Free AI Watermark Remover for Images &amp; Videos (Runs in Your Browser)</title>
   <meta name="description" content="Remove watermarks from AI-generated images (Gemini, DALL·E, Midjourney, Firefly) and short videos. 100% free, private, and offline — the AI runs entirely in your browser. No accounts, no uploads, no cloud.">
@@ -70,7 +100,7 @@
       "name": "DiceCodes",
       "url": "https://dicecodes.com"
     },
-    "softwareVersion": "1.0.0",
+    "softwareVersion": "1.1.0",
     "featureList": [
       "Remove watermarks from AI-generated images (Gemini, DALL-E, Midjourney, Adobe Firefly, Bing Image Creator)",
       "Remove watermarks from short videos",
@@ -102,7 +132,7 @@
     <div class="brand">
       <img src="assets/logo-icon.svg" alt="" class="brand-icon">
       <span class="brand-name">WatermarkOut</span>
-      <span class="badge" id="version-badge">v1.0.0</span>
+      <span class="badge" id="version-badge">v1.1.0</span>
     </div>
     <nav class="topnav">
       <button class="nav-btn active" data-view="app">Editor</button>
@@ -156,11 +186,18 @@
       <!-- Quality -->
       <div class="card" id="quality-card">
         <p class="label">QUALITY</p>
-        <div class="radio-group">
-          <label><input type="radio" name="quality" value="fast"> <span>Fast</span></label>
-          <label><input type="radio" name="quality" value="balanced" checked> <span>Balanced</span></label>
-          <label><input type="radio" name="quality" value="best"> <span>Best Quality</span></label>
+        <div class="radio-group" role="radiogroup" aria-label="Removal quality">
+          <label title="Tight crop — sharpest detail on the watermark, least surrounding context. One AI pass.">
+            <input type="radio" name="quality" value="fast"> <span>Fast</span>
+          </label>
+          <label title="Wider crop — best balance of detail and blending with the surrounding image. One AI pass.">
+            <input type="radio" name="quality" value="balanced" checked> <span>Balanced</span>
+          </label>
+          <label title="Two AI passes: a wide pass for structure, then a tighter pass to sharpen. Roughly 2× slower.">
+            <input type="radio" name="quality" value="best"> <span>Best</span>
+          </label>
         </div>
+        <p class="hint" id="quality-hint">Balanced — one AI pass, wide context.</p>
 
         <p class="label">MASK EXPAND</p>
         <input type="range" min="0" max="32" value="8" class="slider" id="mask-expand">
@@ -187,8 +224,28 @@
 
 
 
+      <!-- Storage & engine — surfaces model-cache.js and fs-folder.js, which
+           are fully implemented but previously had no UI to reach them. -->
+      <div class="card" id="storage-card">
+        <p class="label">STORAGE &amp; ENGINE</p>
+        <dl class="status-list">
+          <dt>AI model</dt>   <dd class="status-mini" id="model-status">Checking…</dd>
+          <dt>Running on</dt> <dd class="status-mini" id="backend-status">—</dd>
+          <dt>Used</dt>       <dd class="status-mini" id="storage-status">—</dd>
+          <dt>Saves to</dt>   <dd class="status-mini" id="folder-status">—</dd>
+        </dl>
+        <button class="btn-ghost btn-sm btn-full" id="btn-pick-folder"
+                title="Keep the model and your results in a real folder on disk, so clearing browser data doesn't lose them">
+          📁 Use a folder on my disk
+        </button>
+        <button class="btn-ghost btn-sm btn-full" id="btn-clear-model"
+                title="Remove the cached AI model from this device">
+          🗑 Clear cached model
+        </button>
+      </div>
+
       <!-- Privacy reminder -->
-      <div class="privacy-note">
+      <div class="privacy-note" id="privacy-note">
         <p>🔒 Your file never leaves this browser tab.</p>
       </div>
 
@@ -241,13 +298,13 @@
             <span class="tool-icon">✨</span> Apply
           </button>
           <div class="separator"></div>
-          <button class="tool-btn active" data-tool="rect" title="Rectangle (R) — drag to refine">
+          <button class="tool-btn active" data-tool="rect" aria-pressed="true" title="Rectangle (R) — drag to refine">
             <span class="tool-icon">▭</span> Rect
           </button>
-          <button class="tool-btn" data-tool="brush" title="Brush (B)">
+          <button class="tool-btn" data-tool="brush" aria-pressed="false" title="Brush (B)">
             <span class="tool-icon">✏</span> Brush
           </button>
-          <button class="tool-btn" data-tool="erase" title="Eraser (E) — remove from mask">
+          <button class="tool-btn" data-tool="erase" aria-pressed="false" title="Eraser (E) — remove from mask">
             <span class="tool-icon">⌫</span> Erase
           </button>
           <div class="separator"></div>
@@ -271,7 +328,10 @@
           <div class="canvas-wrap" id="canvas-wrap">
             <canvas id="canvas-image"></canvas>
             <canvas id="canvas-result" hidden></canvas>
-            <canvas id="canvas-mask"></canvas>
+            <!-- tabindex makes the mask drawable without a pointer: arrow keys
+                 move a crosshair, Enter paints or sets a rectangle corner. -->
+            <canvas id="canvas-mask" tabindex="0" role="application"
+                    aria-label="Watermark mask. Use the arrow keys to move the crosshair, Enter to draw. Hold Shift for larger steps, Alt for single pixels."></canvas>
             <!-- Video playback elements (shown only when state.kind === 'video' and a result/original is being previewed) -->
             <video id="video-original" hidden controls preload="auto"></video>
             <video id="video-result" hidden controls preload="auto"></video>
@@ -283,7 +343,11 @@
           <!-- Hint shown when no mask drawn yet -->
           <div class="stage-hint" id="stage-hint">
             <p>↑ Pick a watermark preset, or drag a rectangle</p>
+            <p class="stage-hint-kbd">Keyboard: focus the canvas, then arrow keys to move, Enter to draw</p>
           </div>
+
+          <!-- Screen-reader announcements for keyboard masking -->
+          <div class="sr-only" id="mask-status" role="status" aria-live="polite"></div>
 
           <!-- HUGE PROCESSING OVERLAY -->
           <div class="processing-overlay" id="processing-overlay" hidden>
@@ -318,9 +382,48 @@
   <!-- TOAST CONTAINER -->
   <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
+  <!-- DEBUG PANEL — toggled with the ` key, the 🪲 button, or ?debug in the URL.
+       Wired up by js/debug.js; error messages elsewhere point users here. -->
+  <button class="debug-toggle" id="debug-toggle" title="Debug panel (`)" aria-label="Toggle debug panel">🪲</button>
+  <aside class="debug-panel" id="debug-panel" hidden aria-label="Debug panel">
+    <header class="debug-head">
+      <strong>Diagnostics</strong>
+      <button class="debug-close" id="debug-close" aria-label="Close debug panel">✕</button>
+    </header>
+    <dl class="debug-grid">
+      <dt>Version</dt>      <dd id="dbg-version">—</dd>
+      <dt>Cross-origin isolated</dt> <dd id="dbg-coi">—</dd>
+      <dt>Backend</dt>      <dd id="dbg-backend">—</dd>
+      <dt>Threads</dt>      <dd id="dbg-threads">—</dd>
+      <dt>Model</dt>        <dd id="dbg-model">—</dd>
+      <dt>Ready</dt>        <dd id="dbg-ready">—</dd>
+      <dt>File</dt>         <dd id="dbg-file">—</dd>
+      <dt>Type</dt>         <dd id="dbg-filetype">—</dd>
+      <dt>Dimensions</dt>   <dd id="dbg-dims">—</dd>
+      <dt>Mask coverage</dt><dd id="dbg-coverage">—</dd>
+      <dt>Tool</dt>         <dd id="dbg-tool">—</dd>
+      <dt>Quality</dt>      <dd id="dbg-quality">balanced</dd>
+      <dt>Removes</dt>      <dd id="dbg-removes">0</dd>
+      <dt>Last action</dt>  <dd id="dbg-action">—</dd>
+      <dt>Last error</dt>   <dd id="dbg-error">—</dd>
+    </dl>
+    <div class="debug-actions">
+      <button class="btn-ghost btn-sm" id="dbg-force-remove">Force remove</button>
+      <button class="btn-ghost btn-sm" id="dbg-fill-mask">Fill test mask</button>
+      <button class="btn-ghost btn-sm" id="dbg-copy">Copy state</button>
+    </div>
+    <pre class="debug-log" id="dbg-log"></pre>
+  </aside>
 
-  <!-- ONNX Runtime Web (loaded async). crossorigin needed under COI. -->
-  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js" crossorigin="anonymous"></script>
+
+  <!-- ONNX Runtime Web. crossorigin is needed under COI; integrity pins the
+       exact bytes so a compromised or swapped CDN file simply fails to load
+       rather than running with full page privileges.
+       Recompute with:
+         curl -sL <src> | openssl dgst -sha384 -binary | openssl base64 -A -->
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"
+          integrity="sha384-RPL/K8tc0JVaNWsunkEmCzLeieefvFX2UCRLKLmLVChCI6P+CTKhzqF7VIeCc3Zp"
+          crossorigin="anonymous"></script>
 
   <!-- App modules -->
   <script type="module" src="js/app.js"></script>

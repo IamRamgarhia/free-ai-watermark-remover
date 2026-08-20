@@ -363,6 +363,24 @@ body.app-page { height: 100vh; overflow: hidden; }
 .status-mini.error { color: var(--error); }
 .status-card .btn-ghost { margin-top: 4px; }
 
+/* Storage & engine card: label on the left, live value on the right. */
+.status-list {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 10px;
+  align-items: baseline;
+  margin: 0 0 10px;
+}
+.status-list dt {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.status-list dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+#storage-card .btn-ghost + .btn-ghost { margin-top: 6px; }
+
 /* === Privacy note === */
 .privacy-note {
   background: rgba(74, 222, 128, 0.06);
@@ -467,6 +485,18 @@ body.app-page { height: 100vh; overflow: hidden; }
   background: var(--accent-light);
   border: none;
   cursor: pointer;
+}
+/* `outline: none` above kills the default focus ring, so put a visible one
+   back for keyboard users — .select does the same thing below. */
+.slider:focus-visible {
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  border-radius: 9999px;
+}
+.slider:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px var(--accent-glow);
+}
+.slider:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 4px var(--accent-glow);
 }
 .slider-sm { width: 120px; margin: 0; }
 .slider-value {
@@ -1263,8 +1293,131 @@ body.app-page { height: 100vh; overflow: hidden; }
   to   { transform: scaleX(0); }
 }
 
+/* === Debug panel === */
+/* Toggled by js/debug.js via the ` key, the 🪲 button, or ?debug in the URL. */
+.debug-toggle {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  z-index: 60;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.15s, border-color 0.15s;
+}
+.debug-toggle:hover { opacity: 1; border-color: var(--border-accent); }
+
+.debug-panel {
+  position: fixed;
+  right: 12px;
+  bottom: 56px;
+  z-index: 60;
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(70vh, 620px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-focus);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  font-size: 12px;
+  overflow: hidden;
+}
+.debug-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.debug-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+.debug-close:hover { color: var(--text-primary); }
+
+.debug-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 3px 10px;
+  margin: 0;
+  overflow-y: auto;
+}
+.debug-grid dt { color: var(--text-muted); }
+.debug-grid dd {
+  margin: 0;
+  font-family: 'DM Mono', monospace;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+.debug-grid dd.ok    { color: var(--success); }
+.debug-grid dd.warn  { color: var(--warning); }
+.debug-grid dd.error { color: var(--error); }
+
+.debug-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.debug-log {
+  flex: 1;
+  min-height: 80px;
+  max-height: 180px;
+  margin: 0;
+  padding: 8px;
+  overflow: auto;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-family: 'DM Mono', monospace;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* === Utilities === */
+/* Visually hidden but still read by screen readers. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.stage-hint-kbd {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+/* The mask canvas is keyboard-operable, so it needs a visible focus ring. */
+#canvas-mask:focus-visible {
+  outline: 2px solid var(--accent-light);
+  outline-offset: 2px;
+}
 .text-muted { color: var(--text-muted); }
+.hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
 .ml-auto { margin-left: auto; }
 [hidden] { display: none !important; }
 

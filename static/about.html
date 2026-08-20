@@ -4,6 +4,21 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
+  <!-- Content Security Policy. Stricter than index.html: the About page loads
+       no third-party code at all, only Google Fonts. See index.html for notes. -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    base-uri 'self';
+    object-src 'none';
+    form-action 'none';
+    script-src 'self';
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    font-src 'self' https://fonts.gstatic.com;
+    img-src 'self' data:;
+    manifest-src 'self';
+    connect-src 'self';
+  ">
+
   <title>About WatermarkOut — Built by Prince Ramgarhia (DiceCodes)</title>
   <meta name="description" content="About WatermarkOut — a free, private, browser-based watermark remover for AI-generated images and videos. Built solo by Prince Ramgarhia at DiceCodes in India.">
   <meta name="author" content="Prince Ramgarhia (DiceCodes)">
@@ -85,7 +100,7 @@
         Nothing to install. Nothing to sign up for.
       </p>
       <div class="badge-row">
-        <span class="badge">v1.0.0</span>
+        <span class="badge" id="version-badge">v1.1.0</span>
         <span class="badge">MIT License</span>
         <span class="badge success">No telemetry</span>
         <span class="badge success">No accounts</span>
@@ -111,9 +126,12 @@
     <!-- CREATOR -->
     <section class="about-card creator-card">
       <div class="creator-flex">
+        <!-- Fallback is wired in JS (not an inline onerror=) so the page needs
+             no 'unsafe-inline' in script-src. It stays LOCAL on purpose: an
+             external avatar host would make an outbound request on every About
+             view, contradicting the "network tab is empty" claim above. -->
         <img src="assets/prince-avatar.png" alt="Prince Ramgarhia"
-             class="creator-avatar"
-             onerror="this.src='https://avatars.githubusercontent.com/u/3993100?v=4'">
+             class="creator-avatar" id="creator-avatar">
         <div class="creator-body">
           <p class="label">BUILT BY</p>
           <h2 class="creator-name">Prince Ramgarhia</h2>
@@ -155,8 +173,8 @@
         </li>
         <li>
           <strong>An AI model runs in WebAssembly.</strong> The model
-          (<a href="https://github.com/advimman/lama" target="_blank" rel="noopener">LaMa</a>,
-          ~50 MB, downloaded once and cached) runs inside your browser tab via
+          (<a href="https://github.com/Picsart-AI-Research/MI-GAN" target="_blank" rel="noopener">MI-GAN</a>,
+          29 MB, downloaded once and cached) runs inside your browser tab via
           <a href="https://onnxruntime.ai/docs/tutorials/web/" target="_blank" rel="noopener">ONNX Runtime Web</a>
           — on your GPU if your browser supports WebGPU, otherwise on your CPU.
         </li>
@@ -221,7 +239,7 @@
             <p class="text-muted">Monthly or one-time</p>
           </div>
         </a>
-        <a href="https://github.com/IamRamgarhia/watermarkout"
+        <a href="https://github.com/IamRamgarhia/free-ai-watermark-remover"
            target="_blank" rel="noopener" class="support-tile">
           <div class="support-icon">⭐</div>
           <div>
@@ -237,14 +255,14 @@
       <h2>🔧 Built with</h2>
       <ul class="tech-list">
         <li><strong>Vanilla HTML/CSS/JS</strong> — no build step, no framework, no node_modules</li>
-        <li><strong>LaMa</strong> — Large Mask Inpainting (Suvorov et al., 2021)</li>
+        <li><strong>MI-GAN</strong> — mobile/browser-optimized inpainting (Picsart Research, ICCV 2023)</li>
         <li><strong>ONNX Runtime Web</strong> — WebGPU + WASM AI inference in the browser</li>
-        <li><strong>OpenCV.js</strong> — image preprocessing (when added)</li>
+        <li><strong>Canvas 2D</strong> — masking, cropping, and compositing (no image libraries)</li>
         <li><strong>IndexedDB</strong> + <strong>Service Worker</strong> — offline support</li>
         <li><strong>GitHub Pages</strong> + <strong>Hugging Face</strong> — free hosting forever</li>
       </ul>
       <p class="text-muted">
-        Source: <a href="https://github.com/IamRamgarhia/watermarkout" target="_blank" rel="noopener">github.com/IamRamgarhia/watermarkout</a>
+        Source: <a href="https://github.com/IamRamgarhia/free-ai-watermark-remover" target="_blank" rel="noopener">github.com/IamRamgarhia/free-ai-watermark-remover</a>
         · License: MIT · Audit anything. Fork anything.
       </p>
     </section>
@@ -262,6 +280,8 @@
     </footer>
 
   </main>
+
+  <script type="module" src="js/about.js"></script>
 
 </body>
 </html>
