@@ -347,11 +347,7 @@ async function onFileLoaded({ file, image, kind, error }) {
   D.btnStartOver.disabled = false;
 
   // Fit after the next layout pass so .stage has its real dimensions
-  requestAnimationFrame(() => {
-    fitCanvasToStage();
-    // Also fit after a slight delay to account for any async layout shifts
-    setTimeout(fitCanvasToStage, 100);
-  });
+  scheduleFit();
 
   toast(kind === 'video'
     ? 'Video loaded. Draw a rectangle around the watermark on the first frame, then click Remove.'
@@ -504,6 +500,26 @@ function releaseVideoUrls() {
     el.load();
     el.hidden = true;
   }
+}
+
+/**
+ * Size the canvas stack to the stage, retrying as layout settles.
+ *
+ * The retries are scheduled INDEPENDENTLY of requestAnimationFrame, which
+ * matters: rAF does not fire in a background or non-compositing tab. The
+ * previous version nested its fallback setTimeout *inside* the rAF callback,
+ * so if rAF never ran neither did the fallback, and the canvas kept its native
+ * pixel size — a 832x1216 image rendered at full size inside a 385px stage and
+ * was clipped to the top third. Loading a file and switching tab was enough to
+ * trigger it.
+ *
+ * Sizing is idempotent, so running it a few times costs nothing.
+ */
+function scheduleFit() {
+  fitCanvasToStage();                      // now, in case layout is already settled
+  requestAnimationFrame(fitCanvasToStage); // next paint, when visible
+  setTimeout(fitCanvasToStage, 100);       // and unconditionally, when not
+  setTimeout(fitCanvasToStage, 400);
 }
 
 function resetToDropzone() {
@@ -841,10 +857,7 @@ async function runVideoRemoval(maskData) {
   setPreviewLabel('after');
 
   // Refit so the video sits properly in the stage
-  requestAnimationFrame(() => {
-    fitCanvasToStage();
-    setTimeout(fitCanvasToStage, 100);
-  });
+  scheduleFit();
 
   dbg.log(`Video processed in ${(tMs / 1000).toFixed(1)}s — ${(blob.size / 1024 / 1024).toFixed(1)} MB output`);
   toast(`Video ready. Press play to preview, then Download.`, 'success', 5000);
