@@ -117,31 +117,65 @@
 
     <h2>Which watermarks it can remove</h2>
     <p>
-      The tool ships with one-click presets for the badges the major image
-      generators add, because each one sits in a predictable spot at a predictable
-      size. Pick the matching preset and the mask is drawn for you:
+      The detector looks for a badge rather than assuming where one is, so it is
+      not limited to the list below — a stock-photo tag, a channel bug or a logo
+      you added yourself all work the same way. What the list tells you is which
+      generators actually stamp anything in the first place, because several
+      widely-repeated claims are simply out of date.
     </p>
     <div class="content-table-wrap">
       <table>
         <thead>
-          <tr><th>Generator</th><th>What it stamps</th><th>Preset</th></tr>
+          <tr><th>Generator</th><th>Visible badge?</th><th>Notes</th></tr>
         </thead>
         <tbody>
-          <tr><td>Google Gemini</td><td>Sparkle badge in a bottom corner</td><td>Gemini (bottom-right / bottom-left)</td></tr>
-          <tr><td>OpenAI DALL·E</td><td>Small text tag, or the DALL·E 2 colour bar</td><td>DALL·E bottom-right / colour bar</td></tr>
-          <tr><td>Midjourney</td><td>Credit strip along the bottom edge</td><td>Midjourney</td></tr>
-          <tr><td>Adobe Firefly</td><td>Rounded corner badge</td><td>Adobe Firefly</td></tr>
-          <tr><td>Bing Image Creator</td><td>Bing logo in the corner</td><td>Bing Image Creator</td></tr>
-          <tr><td>Meta AI</td><td>"Imagined with AI" badge</td><td>Meta AI</td></tr>
-          <tr><td>Stock photo sites</td><td>Repeating diagonal tiled pattern</td><td>Stock photo tiled grid</td></tr>
+          <tr>
+            <td>Google Gemini / Imagen</td>
+            <td>Yes — bottom-right</td>
+            <td>A white sparkle blended into the image. Since August 2026 paid tiers can switch it off at source. Size varies in fixed steps rather than scaling smoothly.</td>
+          </tr>
+          <tr>
+            <td>Grok (xAI)</td>
+            <td>Yes — bottom-right</td>
+            <td><strong>xAI's Acceptable Use Policy prohibits removing it.</strong> Please don't use this tool on Grok output.</td>
+          </tr>
+          <tr>
+            <td>Bing Image Creator / Designer</td>
+            <td>Yes — bottom-left</td>
+            <td>Last confirmed by Microsoft in 2024; we have not found a 2026 update either way.</td>
+          </tr>
+          <tr>
+            <td>Meta AI</td>
+            <td>Older images only</td>
+            <td>The "Imagined with AI" label appeared on earlier output. Newer Meta models label invisibly instead.</td>
+          </tr>
+          <tr>
+            <td>Midjourney</td>
+            <td><strong>No</strong></td>
+            <td>Midjourney has never added a visible watermark on any tier. If you see a mark on a Midjourney image, something else put it there.</td>
+          </tr>
+          <tr>
+            <td>OpenAI / DALL·E</td>
+            <td><strong>No</strong></td>
+            <td>DALL·E 2 and 3 were retired in May 2026. The old five-colour corner bar only appears on archived DALL·E 2 images.</td>
+          </tr>
+          <tr>
+            <td>Adobe Firefly</td>
+            <td>Unclear</td>
+            <td>Reports conflict and we could not confirm the current behaviour. Run detection and see.</td>
+          </tr>
+          <tr>
+            <td>Stock photo sites</td>
+            <td>Yes</td>
+            <td>Repeating diagonal tiles. Mask these by hand — they cover the frame rather than a corner.</td>
+          </tr>
         </tbody>
       </table>
     </div>
     <p>
       Anything else — a logo, a date stamp, a caption, an unwanted object — you can
-      mask by hand with the rectangle or brush tool. The AI does not care what the
-      thing is; it only sees the region you painted and fills it in from the
-      surrounding pixels.
+      mask by hand with the rectangle or brush tool. The tool does not care what
+      the thing is; it only sees the region you marked.
     </p>
 
     <h2>How to remove a watermark</h2>
@@ -200,6 +234,40 @@
       watermark.
     </p>
 
+    <h2>What this does <em>not</em> remove</h2>
+    <p>
+      This matters more than anything else on this page, so it gets its own
+      section rather than a footnote.
+    </p>
+    <p>
+      A visible badge is not the only mark on an AI-generated image. Google
+      embeds <strong>SynthID</strong>, and OpenAI's images now carry it too. Meta's
+      newer models use something equivalent they call Content Seal. These are not
+      stamps in a corner — the signal is spread across the entire picture,
+      encoded into the pixels themselves.
+    </p>
+    <p>
+      <strong>Removing the visible badge removes the visible badge, and nothing
+      else.</strong> Independent testing of SynthID found it survived conversion to
+      greyscale, inversion, added noise, geometric distortion, AI upscaling,
+      repeated downscale-and-upscale cycles, photographing the screen, and over a
+      thousand rounds of iterative degradation. The only things that defeated it
+      also destroyed the image. Google's own settings page says the visible
+      watermark toggle "doesn't affect SynthID watermarks or Content Credentials".
+    </p>
+    <p>
+      One thing that <em>is</em> lost, unavoidably: saving a file from this tool
+      rebuilds it from raw pixels, which discards the original file's metadata —
+      including C2PA Content Credentials, EXIF and colour profile. That is a side
+      effect of how browsers export images, not a feature, and it does not touch
+      the pixel-level watermark either.
+    </p>
+    <p>
+      So if your goal is to make an image undetectable as AI-generated, this tool
+      will not do that and neither will any other visible-watermark remover. If
+      your goal is a cleaner picture for your own use, it will.
+    </p>
+
     <h2>Fair use</h2>
     <div class="ethics-note">
       <p>
@@ -212,8 +280,16 @@
         to get around a stock library's licensing, or to pass AI-generated images off
         as photographs. Provenance badges exist so people can tell what they are
         looking at, and removing one to mislead somebody is a choice about honesty,
-        not about software. Check the terms of the service that generated your image
-        before you publish the result.
+        not about software.
+      </p>
+      <p>
+        Two specifics worth knowing. <strong>xAI's Acceptable Use Policy expressly
+        forbids removing the watermark from Grok images</strong> — that is a term you
+        agreed to, not a grey area. And since August 2026 the EU AI Act and
+        California's AI Transparency Act both require AI providers to disclose
+        generated content, which is why several generators now let you turn the
+        visible badge off at source. If you have that option, using it is cleaner
+        than editing the image afterwards.
       </p>
     </div>
 
