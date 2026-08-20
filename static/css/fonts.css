@@ -1,0 +1,40 @@
+/* Self-hosted fonts — shared by index.html and about.html.
+ *
+ * These used to load from fonts.googleapis.com / fonts.gstatic.com. That
+ * contradicted the site's core claim: About tells visitors to open the Network
+ * tab and see no requests, while every page view was handing their IP to a
+ * third party. Self-hosting makes that claim true, removes a render-blocking
+ * cross-origin request, and means the fonts work offline like everything else.
+ *
+ * Both families are SIL Open Font License 1.1 — see assets/fonts/OFL.txt.
+ * Latin subset only; the UI is English.
+ *
+ * To refresh: fetch the css2 URL with a modern browser User-Agent, pull the
+ * `latin` @font-face blocks, and download the woff2 files they point at.
+ */
+
+/* Syne ships as a single variable font covering the whole 400-800 range,
+   so one file serves every weight the UI uses. */
+@font-face {
+  font-family: 'Syne';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('../assets/fonts/syne-variable.woff2') format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'DM Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/dm-mono-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'DM Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../assets/fonts/dm-mono-500.woff2') format('woff2');
+}

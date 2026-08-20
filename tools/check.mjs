@@ -173,6 +173,93 @@ const manifest  = JSON.parse(read('manifest.webmanifest'));
   }
 }
 
+// === 8. No third-party assets on the page ==================================
+// The site's whole pitch is "nothing leaves your browser", and About tells
+// readers to verify it in the Network tab. Fonts used to load from Google,
+// which quietly made that false. Only the two documented third parties are
+// allowed: the ONNX runtime (jsDelivr) and the model host (HuggingFace).
+{
+  // Own origin is not third-party; ORT and the model host are the two documented ones.
+  const ALLOWED = ['cdn.jsdelivr.net', 'huggingface.co', 'hf.co', 'iamramgarhia.github.io'];
+  const offenders = [];
+  for (const [label, text] of [['index.html', indexHtml], ['about.html', aboutHtml]]) {
+    for (const m of text.matchAll(/(?:src|href)="(https?:\/\/[^"]+)"/g)) {
+      const url = m[1];
+      const before = text.slice(Math.max(0, m.index - 200), m.index);
+      // <a href> is a navigation link, and rel="canonical"/manifest/preconnect
+      // point at metadata rather than a loaded sub-resource.
+      if (/<a\s[^>]*$/.test(before)) continue;
+      if (/<link\s[^>]*rel="(canonical|alternate)"[^>]*$/.test(before)) continue;
+      const host = new URL(url).hostname;
+      if (!ALLOWED.some(a => host.endsWith(a))) offenders.push(`${label} → ${url}`);
+    }
+  }
+  if (offenders.length) {
+    fail('no-3p-assets', `third-party asset(s) loaded on the page: ${offenders.join(', ')}`);
+  } else {
+    ok('no-3p-assets', 'fonts and styles are self-hosted; only ORT + model are external');
+  }
+}
+
+// === 9. On-page SEO invariants =============================================
+// The homepage shipped for months with no <h1>, ~220 indexable words, and its
+// entire body behind `hidden` until a 29 MB model loaded — so crawlers saw a
+// loading spinner. These guard against sliding back.
+{
+  const h1s = [...indexHtml.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/g)];
+  if (h1s.length !== 1) {
+    fail('seo-h1', `index.html should have exactly one <h1>, found ${h1s.length}`);
+  } else {
+    ok('seo-h1', `index.html <h1>: "${h1s[0][1].replace(/<[^>]+>/g, '').trim()}"`);
+  }
+
+  if (/id="app-grid"[^>]*\shidden/.test(indexHtml)) {
+    fail('seo-render', '#app-grid is `hidden` again — its content is invisible to crawlers until JS runs');
+  } else {
+    ok('seo-render', '#app-grid renders without waiting on JavaScript');
+  }
+
+  if (!indexHtml.includes('<noscript')) {
+    fail('seo-noscript', 'index.html has no <noscript> fallback');
+  }
+
+  // Rough indexable-word count of <body>, mirroring what a crawler extracts.
+  let body = indexHtml
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<svg[\s\S]*?<\/svg>/gi, '')
+    .replace(/<head[\s\S]*?<\/head>/i, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<[^>]+>/g, ' ');
+  const words = body.split(/\s+/).filter(w => /[A-Za-z]/.test(w)).length;
+  const MIN_WORDS = 700;
+  if (words < MIN_WORDS) {
+    fail('seo-content', `index.html has only ${words} indexable words (want >= ${MIN_WORDS})`);
+  } else {
+    ok('seo-content', `index.html has ${words} indexable words`);
+  }
+
+  const title = indexHtml.match(/<title>([\s\S]*?)<\/title>/)?.[1].trim() ?? '';
+  const desc = indexHtml.match(/<meta name="description" content="([^"]*)"/)?.[1] ?? '';
+  if (title.length > 65) fail('seo-title', `title is ${title.length} chars — truncates in results (aim <= 60)`);
+  else ok('seo-title', `title is ${title.length} chars`);
+  if (desc.length > 165) fail('seo-desc', `meta description is ${desc.length} chars — truncates (aim <= 160)`);
+  else ok('seo-desc', `meta description is ${desc.length} chars`);
+}
+
+// === 10. Sitemap lastmod present and not absurd ============================
+{
+  // Strip XML comments first — they document these tag names by name.
+  const sitemap = read('sitemap.xml').replace(/<!--[\s\S]*?-->/g, '');
+  const locs = (sitemap.match(/<loc>/g) || []).length;
+  const mods = (sitemap.match(/<lastmod>/g) || []).length;
+  if (mods !== locs) {
+    fail('sitemap', `${locs} <loc> entries but ${mods} <lastmod> — every URL should carry one`);
+  } else {
+    ok('sitemap', `${locs} URLs, all with <lastmod>`);
+  }
+}
+
 // === Report =================================================================
 console.log('');
 for (const n of notes) console.log(`  ✓ ${n}`);

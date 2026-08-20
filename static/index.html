@@ -26,8 +26,8 @@
     form-action 'none';
     script-src 'self' blob: 'wasm-unsafe-eval' https://cdn.jsdelivr.net;
     worker-src 'self' blob:;
-    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-    font-src 'self' https://fonts.gstatic.com;
+    style-src 'self' 'unsafe-inline';
+    font-src 'self';
     img-src 'self' data: blob:;
     media-src 'self' blob:;
     manifest-src 'self';
@@ -35,9 +35,10 @@
   ">
 
   <!-- ===== Primary SEO meta ===== -->
-  <title>WatermarkOut — Free AI Watermark Remover for Images &amp; Videos (Runs in Your Browser)</title>
-  <meta name="description" content="Remove watermarks from AI-generated images (Gemini, DALL·E, Midjourney, Firefly) and short videos. 100% free, private, and offline — the AI runs entirely in your browser. No accounts, no uploads, no cloud.">
-  <meta name="keywords" content="watermark remover, ai watermark removal, remove gemini watermark, remove dall-e watermark, remove midjourney watermark, free watermark remover, online watermark remover, browser watermark remover, ai image cleaner, video watermark remover, free ai tool, privacy">
+  <!-- Title kept under ~60 chars so it isn't truncated in results, and leads
+       with the search term rather than the (unknown) brand name. -->
+  <title>Free AI Watermark Remover — No Upload | WatermarkOut</title>
+  <meta name="description" content="Remove watermarks from AI images and short videos free. The AI runs in your browser — files are never uploaded. No account, no sign-up, open source.">
   <meta name="author" content="Prince Ramgarhia (DiceCodes)">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://iamramgarhia.github.io/free-ai-watermark-remover/">
@@ -53,8 +54,8 @@
   <!-- ===== Open Graph (Facebook, LinkedIn, Slack, Discord previews) ===== -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://iamramgarhia.github.io/free-ai-watermark-remover/">
-  <meta property="og:title" content="WatermarkOut — Free AI Watermark Remover (Browser-Based)">
-  <meta property="og:description" content="Remove watermarks from AI-generated images and videos. Runs entirely in your browser — no uploads, no accounts, free forever.">
+  <meta property="og:title" content="Free AI Watermark Remover — Runs in Your Browser">
+  <meta property="og:description" content="Erase watermarks from AI images and short videos. The AI runs in your browser, so your files are never uploaded. Free, open source, no sign-up.">
   <meta property="og:image" content="https://iamramgarhia.github.io/free-ai-watermark-remover/assets/social-preview.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -64,7 +65,7 @@
 
   <!-- ===== Twitter / X Card ===== -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="WatermarkOut — Free AI Watermark Remover">
+  <meta name="twitter:title" content="Free AI Watermark Remover — Runs in Your Browser">
   <meta name="twitter:description" content="Remove watermarks from AI-generated images &amp; videos, entirely in your browser. Free, private, open source.">
   <meta name="twitter:image" content="https://iamramgarhia.github.io/free-ai-watermark-remover/assets/social-preview.png">
   <meta name="twitter:image:alt" content="WatermarkOut interface showing watermark removal">
@@ -100,13 +101,22 @@
       "name": "DiceCodes",
       "url": "https://dicecodes.com"
     },
-    "softwareVersion": "1.1.0",
+    "softwareVersion": "1.2.0",
+    "inLanguage": "en",
+    "isAccessibleForFree": true,
+    "browserRequirements": "Requires JavaScript and WebAssembly. Chrome/Edge 90+, Firefox 90+, Safari 16.4+.",
+    "softwareRequirements": "A modern web browser. No installation or account required.",
+    "permissions": "No account, no network upload. Files are processed locally in the browser.",
+    "license": "https://opensource.org/licenses/MIT",
+    "codeRepository": "https://github.com/IamRamgarhia/free-ai-watermark-remover",
+    "screenshot": "https://iamramgarhia.github.io/free-ai-watermark-remover/assets/social-preview.png",
     "featureList": [
-      "Remove watermarks from AI-generated images (Gemini, DALL-E, Midjourney, Adobe Firefly, Bing Image Creator)",
-      "Remove watermarks from short videos",
-      "Runs entirely in browser — no uploads",
-      "Works offline after first visit",
-      "Free and open source under MIT license"
+      "Remove watermarks from AI-generated images (Gemini, DALL-E, Midjourney, Adobe Firefly, Bing Image Creator, Meta AI)",
+      "Remove watermarks from short videos with audio preserved",
+      "Runs entirely in the browser — files are never uploaded",
+      "Works offline after the first visit",
+      "Rectangle, brush and eraser masking, plus keyboard-only masking",
+      "Free and open source under the MIT license"
     ]
   }
   </script>
@@ -116,10 +126,10 @@
   <link rel="icon" type="image/svg+xml" href="assets/logo-icon.svg">
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap">
-
+  <!-- Fonts are self-hosted (see css/fonts.css) — no third-party request, so
+       the "your files never leave the browser" claim holds for the page too. -->
+  <link rel="preload" href="assets/fonts/syne-variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/fonts.css">
   <link rel="stylesheet" href="css/app.css">
 
   <!-- COI must register BEFORE any module — enables WASM threads + WebGPU -->
@@ -132,7 +142,7 @@
     <div class="brand">
       <img src="assets/logo-icon.svg" alt="" class="brand-icon">
       <span class="brand-name">WatermarkOut</span>
-      <span class="badge" id="version-badge">v1.1.0</span>
+      <span class="badge" id="version-badge">v1.2.0</span>
     </div>
     <nav class="topnav">
       <button class="nav-btn active" data-view="app">Editor</button>
@@ -151,23 +161,50 @@
     <button class="btn-ghost btn-sm" id="btn-update-dismiss" aria-label="Dismiss">✕</button>
   </div>
 
-  <!-- MODEL LOADER OVERLAY -->
+  <!-- HERO — the page's only H1. Kept compact so it doesn't crowd the editor,
+       but it is real, always-visible, keyword-bearing text that does not
+       depend on JavaScript running. -->
+  <section class="hero">
+    <h1 class="hero-title">Free AI Watermark Remover</h1>
+    <p class="hero-sub">
+      Erase watermarks from AI-generated images and short videos — Gemini, DALL·E,
+      Midjourney, Adobe Firefly, Bing Image Creator and Meta AI. The AI runs inside
+      this browser tab, so your files are never uploaded anywhere.
+    </p>
+  </section>
+
+  <noscript>
+    <div class="noscript-note">
+      <strong>WatermarkOut needs JavaScript.</strong>
+      The watermark removal runs entirely on your own device using WebAssembly,
+      so there is no server to fall back to. Enable JavaScript to use the editor,
+      or <a href="about.html">read how it works</a>.
+    </div>
+  </noscript>
+
+  <!-- MODEL LOADER — a slim status strip, NOT a full-screen gate.
+       It used to be a fixed overlay that covered the page until a 29 MB model
+       finished downloading, which meant neither users nor search-engine
+       crawlers could see any of the app until then. The editor is now visible
+       and usable immediately (drop a file, draw a mask); only the Remove
+       button waits for the model. -->
   <div class="model-loader" id="model-loader">
     <div class="loader-card">
-      <img src="assets/logo.svg" alt="WatermarkOut" class="loader-logo">
-      <h2 id="loader-title">Looking for the AI model…</h2>
-      <p class="text-muted" id="loader-sub">Checking your device first — only downloads if it's not already here.</p>
+      <div class="loader-head">
+        <strong id="loader-title">Looking for the AI model…</strong>
+        <span class="loader-meta" id="loader-meta">Checking…</span>
+      </div>
+      <p class="text-muted loader-sub" id="loader-sub">Checking your device first — only downloads if it's not already here.</p>
       <div class="progress-track">
         <div class="progress-fill" id="loader-fill" style="width:0%"></div>
         <div class="progress-shimmer"></div>
       </div>
-      <p class="loader-meta" id="loader-meta">Checking…</p>
       <p class="loader-tip text-muted" id="loader-backend"></p>
     </div>
   </div>
 
   <!-- MAIN APP -->
-  <main class="app-grid" id="app-grid" hidden>
+  <main class="app-grid" id="app-grid">
 
     <!-- LEFT SIDEBAR — all controls visible at all times -->
     <aside class="sidebar">
@@ -379,40 +416,260 @@
     </section>
   </main>
 
+  <!-- ===================================================================
+       Indexable content. This sits OUTSIDE #app-grid on purpose: it must be
+       readable without JavaScript and without waiting on the AI model, and it
+       gives both readers and search engines something more substantial than
+       button labels. Keep every claim here factually true — the whole pitch
+       rests on being verifiable.
+       =================================================================== -->
+  <article class="page-content">
+
+    <h2>Remove AI watermarks without uploading your files</h2>
+    <p>
+      Most online watermark removers work the same way: you upload your picture to
+      a company's server, they process it, and you hope their retention policy says
+      what you think it says. Many then charge a monthly subscription, or stamp
+      their <em>own</em> watermark onto the free-tier result.
+    </p>
+    <p>
+      WatermarkOut takes a different approach. The AI model runs inside your
+      browser tab using WebAssembly, so the picture you are editing never leaves
+      your device. There is no upload step, no account, no queue, and no server
+      that could keep a copy — because there is no server at all. The site is a
+      folder of static files, and the source is
+      <a href="https://github.com/IamRamgarhia/free-ai-watermark-remover" rel="noopener" target="_blank">public under the MIT licence</a>
+      if you want to check that claim rather than take it on trust.
+    </p>
+
+    <h2>Which watermarks it can remove</h2>
+    <p>
+      The tool ships with one-click presets for the badges the major image
+      generators add, because each one sits in a predictable spot at a predictable
+      size. Pick the matching preset and the mask is drawn for you:
+    </p>
+    <div class="content-table-wrap">
+      <table>
+        <thead>
+          <tr><th>Generator</th><th>What it stamps</th><th>Preset</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Google Gemini</td><td>Sparkle badge in a bottom corner</td><td>Gemini (bottom-right / bottom-left)</td></tr>
+          <tr><td>OpenAI DALL·E</td><td>Small text tag, or the DALL·E 2 colour bar</td><td>DALL·E bottom-right / colour bar</td></tr>
+          <tr><td>Midjourney</td><td>Credit strip along the bottom edge</td><td>Midjourney</td></tr>
+          <tr><td>Adobe Firefly</td><td>Rounded corner badge</td><td>Adobe Firefly</td></tr>
+          <tr><td>Bing Image Creator</td><td>Bing logo in the corner</td><td>Bing Image Creator</td></tr>
+          <tr><td>Meta AI</td><td>"Imagined with AI" badge</td><td>Meta AI</td></tr>
+          <tr><td>Stock photo sites</td><td>Repeating diagonal tiled pattern</td><td>Stock photo tiled grid</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      Anything else — a logo, a date stamp, a caption, an unwanted object — you can
+      mask by hand with the rectangle or brush tool. The AI does not care what the
+      thing is; it only sees the region you painted and fills it in from the
+      surrounding pixels.
+    </p>
+
+    <h2>How to remove a watermark</h2>
+    <ol>
+      <li><strong>Drop your file in</strong> — or click Browse. Nothing is uploaded; the file is read straight into the page.</li>
+      <li><strong>Mark the watermark.</strong> Choose a preset from the dropdown, or drag a rectangle over it. Use the brush for awkward shapes and the eraser to trim the mask back.</li>
+      <li><strong>Pick a quality setting.</strong> Balanced suits most images. Best runs a second refinement pass and takes roughly twice as long.</li>
+      <li><strong>Click Remove watermark</strong> and wait. Typically a few seconds on a modern machine.</li>
+      <li><strong>Compare and download.</strong> Press Space to flip between the original and the result, then save it as PNG, JPG or WebP.</li>
+    </ol>
+    <p>
+      A tighter mask almost always beats a loose one. Cover the watermark and a
+      few pixels of margin — not half the picture — and the fill will blend better.
+    </p>
+
+    <h2>Supported formats and limits</h2>
+    <ul>
+      <li><strong>Images:</strong> JPG, PNG, WebP and BMP, up to about 100&nbsp;MB.</li>
+      <li><strong>Video:</strong> MP4, WebM and MOV. Best for short clips; audio is preserved.</li>
+      <li><strong>Browsers:</strong> Chrome and Edge 90+, Firefox 90+, Safari 16.4+. WebGPU is used automatically where available and is considerably faster.</li>
+      <li><strong>Storage:</strong> roughly 250&nbsp;MB free space for the cached model and app.</li>
+    </ul>
+
+    <h2>Honest limitations</h2>
+    <p>
+      Inpainting is a reconstruction, not a recovery — the model invents plausible
+      pixels, it does not uncover what was hidden underneath. Where it struggles:
+    </p>
+    <div class="content-table-wrap">
+      <table>
+        <thead><tr><th>Limitation</th><th>Why</th><th>What helps</th></tr></thead>
+        <tbody>
+          <tr><td>Busy backgrounds — faces, small text, brickwork</td><td>A known weakness of this class of model</td><td>Use a tighter mask, or a desktop tool like <a href="https://github.com/Sanster/IOPaint" rel="noopener" target="_blank">IOPaint</a> for stubborn cases</td></tr>
+          <tr><td>Video uses one static patch</td><td>The AI runs once on a frame, then the clean patch is applied across the clip</td><td>Ideal for fixed corner watermarks; moving content behind the mark may show a static patch</td></tr>
+          <tr><td>Long videos are slow</td><td>Every frame is decoded and re-encoded in the browser</td><td>Trim the clip first</td></tr>
+          <tr><td>Very large images</td><td>A browser tab has a memory ceiling</td><td>Resize before loading</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>Is it really private?</h2>
+    <p>
+      Your images and videos never leave the browser — there is no endpoint to send
+      them to. Two things <em>are</em> fetched over the network, and it would be
+      dishonest not to name them: the app's own files, and a one-time
+      <strong>29&nbsp;MB AI model</strong> downloaded from Hugging Face on first
+      visit. The model is stored on your device and verified against a known
+      checksum each time, so it is never downloaded twice and never silently
+      swapped.
+    </p>
+    <p>
+      After that first load, the app works with no network connection at all. There
+      is no analytics, no error reporting, no cookies and no fonts or scripts
+      pulled from third-party trackers. You can verify all of this the same way we
+      do: open your browser's developer tools, watch the Network tab, and remove a
+      watermark.
+    </p>
+
+    <h2>Fair use</h2>
+    <div class="ethics-note">
+      <p>
+        This tool is meant for images you made or otherwise have the right to edit —
+        cleaning a preview badge off your own generated artwork, removing a logo from
+        a photo you own, tidying up your own footage.
+      </p>
+      <p>
+        Please don't use it to strip watermarks from someone else's copyrighted work,
+        to get around a stock library's licensing, or to pass AI-generated images off
+        as photographs. Provenance badges exist so people can tell what they are
+        looking at, and removing one to mislead somebody is a choice about honesty,
+        not about software. Check the terms of the service that generated your image
+        before you publish the result.
+      </p>
+    </div>
+
+    <h2>Questions</h2>
+
+    <div class="faq-item">
+      <h3>Is it actually free, or is there a catch?</h3>
+      <p>
+        Free, with no paid tier to upgrade to. It costs nothing to run because there
+        is no server — the site is hosted as static files and all the computing
+        happens on your own machine. There is nothing to meter and no usage to bill.
+      </p>
+    </div>
+
+    <div class="faq-item">
+      <h3>Does it put its own watermark on the result?</h3>
+      <p>No. You get the picture back with the masked area filled in and every other pixel untouched.</p>
+    </div>
+
+    <div class="faq-item">
+      <h3>Do my files get uploaded?</h3>
+      <p>
+        No. Files are read into the page and processed there. The only network
+        requests are the app's own files and the one-time model download described
+        above.
+      </p>
+    </div>
+
+    <div class="faq-item">
+      <h3>Does it work offline?</h3>
+      <p>
+        Yes, after the first visit. The app and the model are cached on your device,
+        so you can disconnect entirely and keep working. You can also install it as
+        an app from your browser's address bar.
+      </p>
+    </div>
+
+    <div class="faq-item">
+      <h3>Will it reduce my image quality?</h3>
+      <p>
+        Only inside the mask. Everything outside the region you painted is copied
+        through unchanged, pixel for pixel. Save as PNG to avoid adding any
+        compression of your own.
+      </p>
+    </div>
+
+    <div class="faq-item">
+      <h3>Why is the first visit slow?</h3>
+      <p>
+        It downloads the 29&nbsp;MB AI model once. After that it loads from your own
+        device and starts almost immediately. You can drop a file and mark up the
+        watermark while the model is still downloading.
+      </p>
+    </div>
+
+    <div class="faq-item">
+      <h3>Which AI model does it use?</h3>
+      <p>
+        <a href="https://github.com/Picsart-AI-Research/MI-GAN" rel="noopener" target="_blank">MI-GAN</a>,
+        an inpainting model from Picsart Research (ICCV 2023) built for running on
+        phones and in browsers. It runs through
+        <a href="https://onnxruntime.ai/docs/tutorials/web/" rel="noopener" target="_blank">ONNX Runtime Web</a>,
+        using your GPU via WebGPU where the browser supports it.
+      </p>
+    </div>
+
+    <div class="faq-item">
+      <h3>Can I remove a watermark from a video?</h3>
+      <p>
+        Yes, for short clips. The AI cleans one frame and that patch is applied
+        across the video, which works well for a fixed corner watermark. Audio is
+        kept. A mark that moves around the frame is not handled.
+      </p>
+    </div>
+
+  </article>
+
+  <footer class="site-footer">
+    <p>
+      Built by <a href="https://dicecodes.com" rel="noopener" target="_blank">Prince Ramgarhia (DiceCodes)</a>
+      · <a href="about.html">About</a>
+      · <a href="https://github.com/IamRamgarhia/free-ai-watermark-remover" rel="noopener" target="_blank">Source on GitHub</a>
+      · MIT licensed · Made in India
+    </p>
+  </footer>
+
   <!-- TOAST CONTAINER -->
   <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
   <!-- DEBUG PANEL — toggled with the ` key, the 🪲 button, or ?debug in the URL.
        Wired up by js/debug.js; error messages elsewhere point users here. -->
   <button class="debug-toggle" id="debug-toggle" title="Debug panel (`)" aria-label="Toggle debug panel">🪲</button>
-  <aside class="debug-panel" id="debug-panel" hidden aria-label="Debug panel">
-    <header class="debug-head">
+  <aside class="debug-panel" id="debug-panel" hidden aria-label="Diagnostics panel">
+    <header class="debug-header">
       <strong>Diagnostics</strong>
-      <button class="debug-close" id="debug-close" aria-label="Close debug panel">✕</button>
+      <button class="debug-close" id="debug-close" aria-label="Close diagnostics panel">✕</button>
     </header>
-    <dl class="debug-grid">
-      <dt>Version</dt>      <dd id="dbg-version">—</dd>
-      <dt>Cross-origin isolated</dt> <dd id="dbg-coi">—</dd>
-      <dt>Backend</dt>      <dd id="dbg-backend">—</dd>
-      <dt>Threads</dt>      <dd id="dbg-threads">—</dd>
-      <dt>Model</dt>        <dd id="dbg-model">—</dd>
-      <dt>Ready</dt>        <dd id="dbg-ready">—</dd>
-      <dt>File</dt>         <dd id="dbg-file">—</dd>
-      <dt>Type</dt>         <dd id="dbg-filetype">—</dd>
-      <dt>Dimensions</dt>   <dd id="dbg-dims">—</dd>
-      <dt>Mask coverage</dt><dd id="dbg-coverage">—</dd>
-      <dt>Tool</dt>         <dd id="dbg-tool">—</dd>
-      <dt>Quality</dt>      <dd id="dbg-quality">balanced</dd>
-      <dt>Removes</dt>      <dd id="dbg-removes">0</dd>
-      <dt>Last action</dt>  <dd id="dbg-action">—</dd>
-      <dt>Last error</dt>   <dd id="dbg-error">—</dd>
-    </dl>
-    <div class="debug-actions">
-      <button class="btn-ghost btn-sm" id="dbg-force-remove">Force remove</button>
-      <button class="btn-ghost btn-sm" id="dbg-fill-mask">Fill test mask</button>
-      <button class="btn-ghost btn-sm" id="dbg-copy">Copy state</button>
+    <div class="debug-body">
+      <div class="debug-section">
+        <div class="debug-row"><span>Version</span><b id="dbg-version">—</b></div>
+        <div class="debug-row"><span>Cross-origin isolated</span><b id="dbg-coi">—</b></div>
+        <div class="debug-row"><span>Backend</span><b id="dbg-backend">—</b></div>
+        <div class="debug-row"><span>Threads</span><b id="dbg-threads">—</b></div>
+        <div class="debug-row"><span>Model</span><b id="dbg-model">—</b></div>
+        <div class="debug-row"><span>Ready</span><b id="dbg-ready">—</b></div>
+      </div>
+      <div class="debug-section">
+        <div class="debug-row"><span>File</span><b id="dbg-file">—</b></div>
+        <div class="debug-row"><span>Type</span><b id="dbg-filetype">—</b></div>
+        <div class="debug-row"><span>Dimensions</span><b id="dbg-dims">—</b></div>
+        <div class="debug-row"><span>Mask coverage</span><b id="dbg-coverage">—</b></div>
+        <div class="debug-row"><span>Tool</span><b id="dbg-tool">—</b></div>
+        <div class="debug-row"><span>Quality</span><b id="dbg-quality">balanced</b></div>
+        <div class="debug-row"><span>Removes</span><b id="dbg-removes">0</b></div>
+      </div>
+      <div class="debug-section">
+        <div class="debug-row"><span>Last action</span><b id="dbg-action">—</b></div>
+        <div class="debug-row"><span>Last error</span><b id="dbg-error" class="dbg-error-text">—</b></div>
+      </div>
+      <div class="debug-actions">
+        <button class="btn-ghost btn-sm" id="dbg-force-remove">Force remove</button>
+        <button class="btn-ghost btn-sm" id="dbg-fill-mask">Fill test mask</button>
+        <button class="btn-ghost btn-sm" id="dbg-copy">Copy state</button>
+      </div>
+      <details class="debug-log-wrap">
+        <summary>Event log</summary>
+        <pre class="debug-log" id="dbg-log"></pre>
+      </details>
     </div>
-    <pre class="debug-log" id="dbg-log"></pre>
   </aside>
 
 
@@ -421,7 +678,9 @@
        rather than running with full page privileges.
        Recompute with:
          curl -sL <src> | openssl dgst -sha384 -binary | openssl base64 -A -->
-  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"
+  <!-- `defer` so this doesn't block parsing. Deferred classic scripts and module
+       scripts run in document order, so `ort` is still defined before app.js. -->
+  <script defer src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"
           integrity="sha384-RPL/K8tc0JVaNWsunkEmCzLeieefvFX2UCRLKLmLVChCI6P+CTKhzqF7VIeCc3Zp"
           crossorigin="anonymous"></script>
 

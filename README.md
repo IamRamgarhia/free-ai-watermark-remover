@@ -4,7 +4,7 @@
 
 # WatermarkOut
 
-### The only watermark remover you'll never have to pay for.
+### A watermark remover that runs on your machine, not someone's server.
 
 **Free · Private · Open Source · Runs entirely in your browser**
 
@@ -68,7 +68,7 @@ No build step. No npm install. No compilation. Just static files.
 
 ## 💡 Why it exists
 
-Online watermark removers charge ₹800–₹2,500 / month ($10–$30), upload your private photos to unknown servers, and add their own watermark on the free tier. WatermarkOut runs the AI **inside your browser tab** — verifiable in DevTools (Network tab stays empty after first load).
+Most online watermark removers upload your private photos to a server you don't control, charge a monthly subscription, and stamp their own watermark on the free tier. WatermarkOut runs the AI **inside your browser tab** — and because the source is MIT-licensed, you can verify that rather than trust it.
 
 - ✅ Free forever — costs $0 to host on GitHub Pages
 - ✅ Open source under MIT — fork, audit, modify
@@ -88,7 +88,7 @@ Online watermark removers charge ₹800–₹2,500 / month ($10–$30), upload y
 | 🎨 Manual masking | Rectangle, brush, eraser, undo — mouse **or** keyboard |
 | ⚙️ Quality control | Fast / Balanced / Best — Best runs a 2-pass coarse-to-fine refine |
 | 🔄 BEFORE/AFTER compare | Toggle to see original vs cleaned |
-| 🔒 100% offline AI | After first load, zero outbound requests |
+| 🔒 Offline after first load | Your files are never uploaded; the app works with no connection |
 | 📱 Installable PWA | Desktop icon, standalone window, offline support |
 
 ---
@@ -256,8 +256,8 @@ crosshair — the mask changes only on an explicit **Enter**.
 
 - **No telemetry.** No analytics, no error reporting, no "anonymous usage statistics."
 - **No accounts.** No email, no signup, ever.
-- **No cloud.** The model fetches once from Hugging Face. After that, nothing leaves your device.
-- **Auditable.** Open DevTools → Network tab → use the app → see zero requests. Source is MIT and inspectable.
+- **No cloud.** The 29 MB model is fetched once from Hugging Face and checksum-verified. Your images and videos are never sent anywhere — there is no endpoint to send them to.
+- **Auditable.** Open DevTools → Network tab → remove a watermark → no requests are made. Fonts are self-hosted and there are no third-party scripts, so nothing phones home. Source is MIT and inspectable.
 
 ---
 
