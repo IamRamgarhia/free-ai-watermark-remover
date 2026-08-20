@@ -187,7 +187,20 @@ export function unblendWatermark(imageData, maskData, opts = {}) {
   // inpainter and show the user an unchanged image. Fall back to handing the
   // whole mask over to be filled instead.
   const effectiveFraction = marked ? effective / marked : 0;
-  const fellBack = effectiveFraction < 0.15;
+  // Fall back only when recovery genuinely achieved NOTHING — not merely when
+  // the mask is bigger than the mark.
+  //
+  // This previously required 15% of the MASK to have meaningful alpha, which
+  // quietly punished exactly the masks we tell people to draw. A sparkle is a
+  // thin star, so most of its own bounding box is empty, and auto-detect pads
+  // generously on top of that. A perfectly good translucent badge landed near
+  // 15%, tripped the fallback, and the entire padded box was handed to the
+  // inpainter — producing a flat smear across textured backgrounds, which is
+  // the precise failure this whole module exists to avoid.
+  //
+  // What actually indicates "this is not a translucent overlay" is that almost
+  // no pixel anywhere in the mask was translucent, in absolute terms.
+  const fellBack = effective < 24 && effectiveFraction < 0.02;
   if (fellBack) {
     return {
       result: imageData,

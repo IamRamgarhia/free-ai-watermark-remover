@@ -229,6 +229,25 @@ test('falls back to filling when the mask is not a translucent overlay', () => {
     'must not report the residual as negligible, or nothing would be filled');
 });
 
+test('a thin badge in a generously padded mask still recovers, not falls back', () => {
+  // The regression that shipped: a sparkle occupies a small share of its own
+  // bounding box, and auto-detect pads further. Requiring a high fraction of
+  // the MASK to be translucent wrongly classified this as "not a watermark"
+  // and repainted the whole box.
+  const original = makeOriginal(200, 200);
+  const wm = clone(original);
+  const mask = applyWatermark(wm, 100, 100, 16, 0.55);
+  // Pad the mask well beyond the mark, as the UI does.
+  for (let y = 60; y < 140; y++) {
+    for (let x = 60; x < 140; x++) mask.data[(y * 200 + x) * 4 + 3] = 255;
+  }
+  const { result, stats } = unblendWatermark(wm, mask);
+  assert(stats.fellBack === false,
+    `fell back despite a genuine translucent badge (effective ${(stats.effectiveFraction*100).toFixed(1)}% of mask)`);
+  assert(psnr(result, original, mask) > psnr(wm, original, mask) + 4,
+    'recovery did not improve on doing nothing');
+});
+
 test('an empty mask is a no-op', () => {
   const img = makeOriginal(64, 64);
   const empty = new ImageData(new Uint8ClampedArray(64 * 64 * 4), 64, 64);
