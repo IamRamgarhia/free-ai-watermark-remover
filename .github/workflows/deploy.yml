@@ -39,6 +39,10 @@ jobs:
       # No dependencies, no install step — both scripts are plain ESM.
       - name: Inpainter pixel-math tests
         run: node tools/test-inpainter.mjs
+      - name: Watermark detection tests
+        run: node tools/test-detect.mjs
+      - name: Un-blending recovery tests
+        run: node tools/test-dewatermark.mjs
       - name: Static consistency checks
         run: node tools/check.mjs
       - name: Syntax-check every module

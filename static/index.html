@@ -146,6 +146,7 @@
     </div>
     <nav class="topnav">
       <button class="nav-btn active" data-view="app">Editor</button>
+      <a class="nav-btn" href="guide.html">Guide</a>
       <a class="nav-btn" href="about.html">About</a>
       <span class="status-pill" id="status-pill">
         <span class="status-dot" id="status-dot"></span>
@@ -222,19 +223,27 @@
 
       <!-- Quality -->
       <div class="card" id="quality-card">
-        <p class="label">QUALITY</p>
-        <div class="radio-group" role="radiogroup" aria-label="Removal quality">
-          <label title="Tight crop — sharpest detail on the watermark, least surrounding context. One AI pass.">
-            <input type="radio" name="quality" value="fast"> <span>Fast</span>
+        <p class="label">WHAT ARE YOU REMOVING?</p>
+        <div class="radio-group" role="radiogroup" aria-label="Removal mode">
+          <label title="Most generator badges are semi-transparent, so the picture underneath can be solved for and kept rather than repainted.">
+            <input type="radio" name="mode" value="watermark" checked> <span>Watermark</span>
           </label>
-          <label title="Wider crop — best balance of detail and blending with the surrounding image. One AI pass.">
-            <input type="radio" name="quality" value="balanced" checked> <span>Balanced</span>
-          </label>
-          <label title="Two AI passes: a wide pass for structure, then a tighter pass to sharpen. Roughly 2× slower.">
-            <input type="radio" name="quality" value="best"> <span>Best</span>
+          <label title="A solid object or opaque logo genuinely hides what is behind it, so it has to be painted in by the AI.">
+            <input type="radio" name="mode" value="object"> <span>Object / opaque logo</span>
           </label>
         </div>
-        <p class="hint" id="quality-hint">Balanced — one AI pass, wide context.</p>
+        <p class="hint" id="mode-hint">Recovers the detail hidden under a see-through watermark instead of painting over it.</p>
+
+        <p class="label">QUALITY</p>
+        <div class="radio-group" role="radiogroup" aria-label="Removal quality">
+          <label title="One AI pass over anything that could not be recovered.">
+            <input type="radio" name="quality" value="standard" checked> <span>Standard</span>
+          </label>
+          <label title="A second refinement pass over the same area. Roughly twice as slow.">
+            <input type="radio" name="quality" value="high"> <span>High (2 passes)</span>
+          </label>
+        </div>
+        <p class="hint" id="quality-hint">One AI pass. Only used where recovery was not possible.</p>
 
         <p class="label">MASK EXPAND</p>
         <input type="range" min="0" max="32" value="8" class="slider" id="mask-expand">
@@ -318,21 +327,23 @@
 
         <!-- Toolbar -->
         <div class="toolbar">
-          <label class="tool-label">Watermark</label>
-          <select class="select select-toolbar" id="preset-select" title="Pick the watermark you want to remove for a pixel-perfect preset mask">
-            <option value="custom">Custom (draw yourself)</option>
-            <option value="gemini-br">Gemini (✨ bottom-right)</option>
-            <option value="gemini-bl">Gemini (✨ bottom-left)</option>
-            <option value="dalle-br">DALL·E (bottom-right tag)</option>
-            <option value="dalle-color-bar">DALL·E 2 (color bar bottom-right)</option>
-            <option value="bing-creator">Bing Image Creator (corner icon)</option>
-            <option value="firefly-br">Adobe Firefly (corner)</option>
-            <option value="midjourney-br">Midjourney (bottom-right)</option>
-            <option value="meta-ai">Meta AI (corner)</option>
-            <option value="stock-tile">Stock photo tiled grid</option>
+          <button class="tool-btn primary-tool" id="btn-detect"
+                  title="Scan the image for a watermark and mask it automatically">
+            <span class="tool-icon">✨</span> Detect watermark
+          </button>
+          <select class="select select-toolbar" id="detect-region"
+                  title="Restrict the search if auto-detect picks the wrong thing">
+            <option value="">Search everywhere</option>
+            <option value="bottom-right">Bottom-right only</option>
+            <option value="bottom-left">Bottom-left only</option>
+            <option value="top-right">Top-right only</option>
+            <option value="top-left">Top-left only</option>
+            <option value="bottom">Bottom strip</option>
+            <option value="top">Top strip</option>
           </select>
-          <button class="tool-btn primary-tool" id="btn-apply-preset" title="Apply preset mask">
-            <span class="tool-icon">✨</span> Apply
+          <button class="tool-btn" id="btn-detect-next" hidden
+                  title="That box is wrong - try the next best match">
+            Not it? Try next
           </button>
           <div class="separator"></div>
           <button class="tool-btn active" data-tool="rect" aria-pressed="true" title="Rectangle (R) — drag to refine">
@@ -379,7 +390,7 @@
 
           <!-- Hint shown when no mask drawn yet -->
           <div class="stage-hint" id="stage-hint">
-            <p>↑ Pick a watermark preset, or drag a rectangle</p>
+            <p>↑ Click <strong>Detect watermark</strong>, or drag a rectangle over it</p>
             <p class="stage-hint-kbd">Keyboard: focus the canvas, then arrow keys to move, Enter to draw</p>
           </div>
 
@@ -416,211 +427,31 @@
     </section>
   </main>
 
-  <!-- ===================================================================
-       Indexable content. This sits OUTSIDE #app-grid on purpose: it must be
-       readable without JavaScript and without waiting on the AI model, and it
-       gives both readers and search engines something more substantial than
-       button labels. Keep every claim here factually true — the whole pitch
-       rests on being verifiable.
-       =================================================================== -->
-  <article class="page-content">
-
+  <!-- Short intro only. The full explanation lives on guide.html — a tool page
+       should get you to the tool, not make you scroll past an essay. -->
+  <section class="page-intro">
     <h2>Remove AI watermarks without uploading your files</h2>
     <p>
-      Most online watermark removers work the same way: you upload your picture to
-      a company's server, they process it, and you hope their retention policy says
-      what you think it says. Many then charge a monthly subscription, or stamp
-      their <em>own</em> watermark onto the free-tier result.
+      The AI model runs inside this browser tab using WebAssembly, so the picture
+      you are editing never leaves your device. No upload, no account, no queue —
+      there is no server that could keep a copy, because there is no server.
     </p>
     <p>
-      WatermarkOut takes a different approach. The AI model runs inside your
-      browser tab using WebAssembly, so the picture you are editing never leaves
-      your device. There is no upload step, no account, no queue, and no server
-      that could keep a copy — because there is no server at all. The site is a
-      folder of static files, and the source is
-      <a href="https://github.com/IamRamgarhia/free-ai-watermark-remover" rel="noopener" target="_blank">public under the MIT licence</a>
-      if you want to check that claim rather than take it on trust.
+      Most watermarks from image generators are semi-transparent, which means the
+      picture underneath them still exists. Rather than painting over the badge
+      and inventing new pixels, WatermarkOut solves for what was behind it, so
+      texture and detail survive.
     </p>
-
-    <h2>Which watermarks it can remove</h2>
-    <p>
-      The tool ships with one-click presets for the badges the major image
-      generators add, because each one sits in a predictable spot at a predictable
-      size. Pick the matching preset and the mask is drawn for you:
+    <p class="intro-links">
+      <a href="guide.html">Full guide: supported watermarks, formats, limits and FAQ →</a>
     </p>
-    <div class="content-table-wrap">
-      <table>
-        <thead>
-          <tr><th>Generator</th><th>What it stamps</th><th>Preset</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>Google Gemini</td><td>Sparkle badge in a bottom corner</td><td>Gemini (bottom-right / bottom-left)</td></tr>
-          <tr><td>OpenAI DALL·E</td><td>Small text tag, or the DALL·E 2 colour bar</td><td>DALL·E bottom-right / colour bar</td></tr>
-          <tr><td>Midjourney</td><td>Credit strip along the bottom edge</td><td>Midjourney</td></tr>
-          <tr><td>Adobe Firefly</td><td>Rounded corner badge</td><td>Adobe Firefly</td></tr>
-          <tr><td>Bing Image Creator</td><td>Bing logo in the corner</td><td>Bing Image Creator</td></tr>
-          <tr><td>Meta AI</td><td>"Imagined with AI" badge</td><td>Meta AI</td></tr>
-          <tr><td>Stock photo sites</td><td>Repeating diagonal tiled pattern</td><td>Stock photo tiled grid</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <p>
-      Anything else — a logo, a date stamp, a caption, an unwanted object — you can
-      mask by hand with the rectangle or brush tool. The AI does not care what the
-      thing is; it only sees the region you painted and fills it in from the
-      surrounding pixels.
-    </p>
+  </section>
 
-    <h2>How to remove a watermark</h2>
-    <ol>
-      <li><strong>Drop your file in</strong> — or click Browse. Nothing is uploaded; the file is read straight into the page.</li>
-      <li><strong>Mark the watermark.</strong> Choose a preset from the dropdown, or drag a rectangle over it. Use the brush for awkward shapes and the eraser to trim the mask back.</li>
-      <li><strong>Pick a quality setting.</strong> Balanced suits most images. Best runs a second refinement pass and takes roughly twice as long.</li>
-      <li><strong>Click Remove watermark</strong> and wait. Typically a few seconds on a modern machine.</li>
-      <li><strong>Compare and download.</strong> Press Space to flip between the original and the result, then save it as PNG, JPG or WebP.</li>
-    </ol>
-    <p>
-      A tighter mask almost always beats a loose one. Cover the watermark and a
-      few pixels of margin — not half the picture — and the fill will blend better.
-    </p>
-
-    <h2>Supported formats and limits</h2>
-    <ul>
-      <li><strong>Images:</strong> JPG, PNG, WebP and BMP, up to about 100&nbsp;MB.</li>
-      <li><strong>Video:</strong> MP4, WebM and MOV. Best for short clips; audio is preserved.</li>
-      <li><strong>Browsers:</strong> Chrome and Edge 90+, Firefox 90+, Safari 16.4+. WebGPU is used automatically where available and is considerably faster.</li>
-      <li><strong>Storage:</strong> roughly 250&nbsp;MB free space for the cached model and app.</li>
-    </ul>
-
-    <h2>Honest limitations</h2>
-    <p>
-      Inpainting is a reconstruction, not a recovery — the model invents plausible
-      pixels, it does not uncover what was hidden underneath. Where it struggles:
-    </p>
-    <div class="content-table-wrap">
-      <table>
-        <thead><tr><th>Limitation</th><th>Why</th><th>What helps</th></tr></thead>
-        <tbody>
-          <tr><td>Busy backgrounds — faces, small text, brickwork</td><td>A known weakness of this class of model</td><td>Use a tighter mask, or a desktop tool like <a href="https://github.com/Sanster/IOPaint" rel="noopener" target="_blank">IOPaint</a> for stubborn cases</td></tr>
-          <tr><td>Video uses one static patch</td><td>The AI runs once on a frame, then the clean patch is applied across the clip</td><td>Ideal for fixed corner watermarks; moving content behind the mark may show a static patch</td></tr>
-          <tr><td>Long videos are slow</td><td>Every frame is decoded and re-encoded in the browser</td><td>Trim the clip first</td></tr>
-          <tr><td>Very large images</td><td>A browser tab has a memory ceiling</td><td>Resize before loading</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <h2>Is it really private?</h2>
-    <p>
-      Your images and videos never leave the browser — there is no endpoint to send
-      them to. Two things <em>are</em> fetched over the network, and it would be
-      dishonest not to name them: the app's own files, and a one-time
-      <strong>29&nbsp;MB AI model</strong> downloaded from Hugging Face on first
-      visit. The model is stored on your device and verified against a known
-      checksum each time, so it is never downloaded twice and never silently
-      swapped.
-    </p>
-    <p>
-      After that first load, the app works with no network connection at all. There
-      is no analytics, no error reporting, no cookies and no fonts or scripts
-      pulled from third-party trackers. You can verify all of this the same way we
-      do: open your browser's developer tools, watch the Network tab, and remove a
-      watermark.
-    </p>
-
-    <h2>Fair use</h2>
-    <div class="ethics-note">
-      <p>
-        This tool is meant for images you made or otherwise have the right to edit —
-        cleaning a preview badge off your own generated artwork, removing a logo from
-        a photo you own, tidying up your own footage.
-      </p>
-      <p>
-        Please don't use it to strip watermarks from someone else's copyrighted work,
-        to get around a stock library's licensing, or to pass AI-generated images off
-        as photographs. Provenance badges exist so people can tell what they are
-        looking at, and removing one to mislead somebody is a choice about honesty,
-        not about software. Check the terms of the service that generated your image
-        before you publish the result.
-      </p>
-    </div>
-
-    <h2>Questions</h2>
-
-    <div class="faq-item">
-      <h3>Is it actually free, or is there a catch?</h3>
-      <p>
-        Free, with no paid tier to upgrade to. It costs nothing to run because there
-        is no server — the site is hosted as static files and all the computing
-        happens on your own machine. There is nothing to meter and no usage to bill.
-      </p>
-    </div>
-
-    <div class="faq-item">
-      <h3>Does it put its own watermark on the result?</h3>
-      <p>No. You get the picture back with the masked area filled in and every other pixel untouched.</p>
-    </div>
-
-    <div class="faq-item">
-      <h3>Do my files get uploaded?</h3>
-      <p>
-        No. Files are read into the page and processed there. The only network
-        requests are the app's own files and the one-time model download described
-        above.
-      </p>
-    </div>
-
-    <div class="faq-item">
-      <h3>Does it work offline?</h3>
-      <p>
-        Yes, after the first visit. The app and the model are cached on your device,
-        so you can disconnect entirely and keep working. You can also install it as
-        an app from your browser's address bar.
-      </p>
-    </div>
-
-    <div class="faq-item">
-      <h3>Will it reduce my image quality?</h3>
-      <p>
-        Only inside the mask. Everything outside the region you painted is copied
-        through unchanged, pixel for pixel. Save as PNG to avoid adding any
-        compression of your own.
-      </p>
-    </div>
-
-    <div class="faq-item">
-      <h3>Why is the first visit slow?</h3>
-      <p>
-        It downloads the 29&nbsp;MB AI model once. After that it loads from your own
-        device and starts almost immediately. You can drop a file and mark up the
-        watermark while the model is still downloading.
-      </p>
-    </div>
-
-    <div class="faq-item">
-      <h3>Which AI model does it use?</h3>
-      <p>
-        <a href="https://github.com/Picsart-AI-Research/MI-GAN" rel="noopener" target="_blank">MI-GAN</a>,
-        an inpainting model from Picsart Research (ICCV 2023) built for running on
-        phones and in browsers. It runs through
-        <a href="https://onnxruntime.ai/docs/tutorials/web/" rel="noopener" target="_blank">ONNX Runtime Web</a>,
-        using your GPU via WebGPU where the browser supports it.
-      </p>
-    </div>
-
-    <div class="faq-item">
-      <h3>Can I remove a watermark from a video?</h3>
-      <p>
-        Yes, for short clips. The AI cleans one frame and that patch is applied
-        across the video, which works well for a fixed corner watermark. Audio is
-        kept. A mark that moves around the frame is not handled.
-      </p>
-    </div>
-
-  </article>
 
   <footer class="site-footer">
     <p>
       Built by <a href="https://dicecodes.com" rel="noopener" target="_blank">Prince Ramgarhia (DiceCodes)</a>
+      · <a href="guide.html">Guide</a>
       · <a href="about.html">About</a>
       · <a href="https://github.com/IamRamgarhia/free-ai-watermark-remover" rel="noopener" target="_blank">Source on GitHub</a>
       · MIT licensed · Made in India
@@ -653,7 +484,8 @@
         <div class="debug-row"><span>Dimensions</span><b id="dbg-dims">—</b></div>
         <div class="debug-row"><span>Mask coverage</span><b id="dbg-coverage">—</b></div>
         <div class="debug-row"><span>Tool</span><b id="dbg-tool">—</b></div>
-        <div class="debug-row"><span>Quality</span><b id="dbg-quality">balanced</b></div>
+        <div class="debug-row"><span>Quality</span><b id="dbg-quality">standard</b></div>
+        <div class="debug-row"><span>Mode</span><b id="dbg-mode">watermark</b></div>
         <div class="debug-row"><span>Removes</span><b id="dbg-removes">0</b></div>
       </div>
       <div class="debug-section">

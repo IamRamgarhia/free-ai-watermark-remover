@@ -1269,6 +1269,19 @@ body.app-page {
   to   { transform: scaleX(0); }
 }
 
+.page-intro {
+  max-width: 74ch;
+  margin: 0 auto;
+  padding: 28px 20px 34px;
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+.page-intro h2 { margin: 0 0 12px; font-size: 20px; color: var(--text-primary); }
+.page-intro p { margin: 0 0 12px; }
+.intro-links { margin-top: 16px !important; font-size: 14px; }
+.guide-title { margin: 0 0 24px; font-size: clamp(24px, 4vw, 34px); font-weight: 800; letter-spacing: -0.02em; color: var(--text-primary); }
+
 /* === Hero (the page's H1) === */
 /* Deliberately compact: it carries the page's only H1 plus a real description
    for readers and crawlers, without pushing the editor below the fold. */

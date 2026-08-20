@@ -44,11 +44,23 @@ const MODEL_SIZE = 512;
  * model run, so Best costs about 2× the time of Balanced.
  */
 const QUALITY_PRESETS = {
-  fast:     { contexts: [2.0],      feather: 3 },
+  // `contexts` is one entry per inference pass, giving that pass's crop size as
+  // a multiple of the mask. In practice the crop is clamped to at least 512 (the
+  // model's native size) so a small badge is never upscaled — which means for
+  // the common case these differ only in how many passes run.
+  //
+  // `best` runs a second, tighter pass over the same region: the first
+  // establishes structure with wide context, the second refines it. That is a
+  // full extra model run, so it costs roughly twice the time.
+  standard: { contexts: [3.0],      feather: 6 },
+  high:     { contexts: [3.0, 2.0], feather: 8 },
+
+  // Retained so older saved settings and any external callers keep working.
+  fast:     { contexts: [3.0],      feather: 4 },
   balanced: { contexts: [3.0],      feather: 6 },
-  best:     { contexts: [3.0, 1.8], feather: 8 },
+  best:     { contexts: [3.0, 2.0], feather: 8 },
 };
-const DEFAULT_QUALITY = 'balanced';
+const DEFAULT_QUALITY = 'standard';
 
 let session = null;
 let activeBackend = 'unknown';
@@ -188,20 +200,30 @@ export async function inpaint(imageData, maskData, opts = {}) {
 async function runPass(imageData, maskData, bbox, { context, featherRadius, logRange, passLabel }) {
   const { width: W, height: H } = imageData;
 
-  // Square crop around the mask, sized as a multiple of the mask itself.
+  // Square crop around the mask.
   //
-  // The crop is always resized to the model's fixed 512×512, so a crop SMALLER
-  // than 512 is upscaled going in and downscaled coming out — which spends more
-  // of the model's fixed capacity on the watermark and is how a tight crop buys
-  // detail. (An earlier version floored this at 512 "so we don't upscale", but
-  // that made every context multiplier collapse to the same crop for the common
-  // case — a small corner badge — so the Quality setting had no visible effect.)
+  // Preference order, and the reasoning matters:
   //
-  // The lower bound keeps a little real context around the mask no matter how
-  // aggressive the multiplier is; the upper bound is the image itself.
+  //  1. A crop of EXACTLY 512 at native resolution is ideal. The model input is
+  //     512x512, so the pixels then go in untouched and come back untouched —
+  //     no resampling anywhere in the pipeline, and the model gets the maximum
+  //     real context around the mask.
+  //
+  //  2. Only when the mask is too big to fit in 512 do we take a larger crop and
+  //     scale it down, accepting the loss because there is no alternative.
+  //
+  // An earlier version scaled the crop by a per-quality "context multiplier",
+  // which for a small corner badge meant cropping ~120px and UPSCALING it to
+  // 512. That made the Quality control visibly do something, but upscaling adds
+  // no information — it just fed the model a blurred crop and softened the
+  // result. Fidelity beats a knob that appears to work, so quality now varies
+  // the number of refinement passes instead (see QUALITY_PRESETS).
   const maskDim = Math.max(bbox.w, bbox.h);
-  const minSize = Math.min(Math.round(maskDim * 1.25) + 16, W, H);
-  const cropSize = Math.max(minSize, Math.min(Math.round(maskDim * context), W, H));
+  const needed = Math.round(maskDim * context);
+  const cropSize = Math.min(
+    Math.max(MODEL_SIZE, needed),   // never below native model size…
+    W, H                            // …but never larger than the image
+  );
 
   const centerX = bbox.x + bbox.w / 2;
   const centerY = bbox.y + bbox.h / 2;
