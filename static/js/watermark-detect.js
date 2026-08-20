@@ -100,20 +100,85 @@ export function detectWatermarks(imageData, opts = {}) {
   return kept;
 }
 
-/** Search windows: four corners plus edge strips for wide credit bars. */
+/**
+ * Search windows.
+ *
+ * Corners only, and deliberately tight. An earlier version also scanned
+ * full-width strips along the top and bottom to catch wide "credit bars" —
+ * that was a mistake. A full-width band of ordinary image content (a horizon,
+ * a table edge, the line where someone's trousers meet the floor) has exactly
+ * the profile a wide badge would, and the strip search reliably preferred it
+ * over the real watermark. Precision matters far more than covering a rare
+ * layout, so those are gone; a wide bar can still be masked by hand.
+ */
 function buildRegions(W, H) {
   const cw = Math.round(W * CORNER_FRAC);
   const ch = Math.round(H * CORNER_FRAC);
-  const strip = Math.round(H * 0.14);
   return [
     { name: 'bottom-right', x: W - cw, y: H - ch, w: cw, h: ch, ax: 1, ay: 1 },
     { name: 'bottom-left',  x: 0,      y: H - ch, w: cw, h: ch, ax: 0, ay: 1 },
     { name: 'top-right',    x: W - cw, y: 0,      w: cw, h: ch, ax: 1, ay: 0 },
     { name: 'top-left',     x: 0,      y: 0,      w: cw, h: ch, ax: 0, ay: 0 },
-    // Full-width strips catch wide "credit" bars that straddle the centre.
-    { name: 'bottom',       x: 0, y: H - strip, w: W, h: strip, ax: 0.5, ay: 1 },
-    { name: 'top',          x: 0, y: 0,         w: W, h: strip, ax: 0.5, ay: 0 },
   ].filter(r => r.w > 8 && r.h > 8);
+}
+
+/**
+ * Known badge geometries.
+ *
+ * The crucial thing, and the thing the old fraction-based presets got wrong:
+ * these badges are placed at an ABSOLUTE pixel offset from the corner, at one
+ * of a small set of ABSOLUTE pixel sizes. They do not scale smoothly with the
+ * image.
+ *
+ * That is precisely why fractions failed. "89% across" happens to land near the
+ * badge on a square image and lands somewhere else entirely on a 1408x768 one,
+ * because the same 32px margin is 2.3% of the width but 4.2% of the height.
+ *
+ * Values below are the size classes observed in the wild across generator
+ * revisions. We do not know which applies to a given file, so we generate all
+ * plausible boxes and let the detector score them.
+ */
+const BADGE_PROFILES = [
+  { logo: 48, margin: 32 },
+  { logo: 96, margin: 64 },
+  { logo: 96, margin: 192 },
+  { logo: 36, margin: 96 },
+  { logo: 46, margin: 32 },
+  { logo: 72, margin: 108 },
+];
+
+/**
+ * Candidate badge boxes for a corner, from the known geometries.
+ * Sorted largest-first so a generous box is offered before a tight one.
+ *
+ * @returns {{x:number,y:number,w:number,h:number,profile:string}[]}
+ */
+export function presetBoxes(W, H, corner = 'bottom-right') {
+  const short = Math.min(W, H);
+  const out = [];
+  for (const { logo, margin } of BADGE_PROFILES) {
+    // Skip geometries that cannot fit — a 192px margin is meaningless on a
+    // 512px image.
+    if (logo + margin * 2 > short) continue;
+    const right = corner.endsWith('right');
+    const bottom = corner.startsWith('bottom');
+    out.push({
+      x: right ? W - margin - logo : margin,
+      y: bottom ? H - margin - logo : margin,
+      w: logo,
+      h: logo,
+      profile: `${logo}px @ ${margin}px`,
+    });
+  }
+  // A proportional fallback for generators we have no fixed geometry for.
+  const prop = Math.round(short * 0.075);
+  const pm = Math.round(short * 0.03);
+  out.push({
+    x: corner.endsWith('right') ? W - pm - prop : pm,
+    y: corner.startsWith('bottom') ? H - pm - prop : pm,
+    w: prop, h: prop, profile: 'proportional',
+  });
+  return out;
 }
 
 function scanRegion(imageData, region, W, H) {

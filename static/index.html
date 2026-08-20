@@ -329,23 +329,21 @@
         <!-- Toolbar -->
         <div class="toolbar">
           <button class="tool-btn primary-tool" id="btn-detect"
-                  title="Scan the image for a watermark and mask it automatically">
-            <span class="tool-icon">✨</span> Detect watermark
+                  title="Suggest a mask for the watermark in the chosen corner">
+            <span class="tool-icon">✨</span> Find watermark
           </button>
           <select class="select select-toolbar" id="detect-region"
                   title="Restrict the search if auto-detect picks the wrong thing">
-            <option value="">Search everywhere</option>
-            <option value="bottom-right">Bottom-right only</option>
-            <option value="bottom-left">Bottom-left only</option>
-            <option value="top-right">Top-right only</option>
-            <option value="top-left">Top-left only</option>
-            <option value="bottom">Bottom strip</option>
-            <option value="top">Top strip</option>
+            <option value="bottom-right" selected>Bottom-right (most common)</option>
+            <option value="bottom-left">Bottom-left</option>
+            <option value="top-right">Top-right</option>
+            <option value="top-left">Top-left</option>
           </select>
           <button class="tool-btn" id="btn-detect-next" hidden
-                  title="That box is wrong - try the next best match">
-            Not it? Try next
+                  title="Step to the next candidate position and size">
+            ↻ Try next
           </button>
+          <span class="detect-status" id="detect-status"></span>
           <div class="separator"></div>
           <button class="tool-btn active" data-tool="rect" aria-pressed="true" title="Rectangle (R) — drag to refine">
             <span class="tool-icon">▭</span> Rect

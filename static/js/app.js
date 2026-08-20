@@ -7,7 +7,7 @@ import { APP_VERSION } from './version.js';
 import { bindDropzone, imageToImageData } from './upload.js';
 import { MaskCanvas, dilateMask, maskHasContent } from './mask.js';
 import * as inpainter from './inpainter.js';
-import { detectWatermarks } from './watermark-detect.js';
+import { detectWatermarks, presetBoxes } from './watermark-detect.js';
 import { unblendWatermark, residualIsNegligible } from './dewatermark.js';
 import { registerServiceWorker } from './updates.js';
 import { toast } from './toast.js';
@@ -81,6 +81,7 @@ const D = {
   btnDetect: document.getElementById('btn-detect'),
   btnDetectNext: document.getElementById('btn-detect-next'),
   detectRegion: document.getElementById('detect-region'),
+  detectStatus: document.getElementById('detect-status'),
   btnPickFolder: document.getElementById('btn-pick-folder'),
 
   modelStatus: document.getElementById('model-status'),
@@ -1044,72 +1045,85 @@ function bindUI() {
 
   D.stageModalOk?.addEventListener('click', hideStageModal);
 
-  // === Automatic watermark detection ===
+  // === Finding the watermark ===
   //
-  // This replaces a table of hardcoded coordinates ("Gemini sits at 89% across,
-  // 89% down"). Those were guesses that could not survive a different aspect
-  // ratio or a restyled badge, and in practice they drew the mask beside the
-  // watermark rather than on it. See js/watermark-detect.js for how the search
-  // works. Results are PROPOSED, never silently applied — the detector can be
-  // fooled by a genuinely badge-like object, so the user sees the box and can
-  // step to the next candidate or redraw it by hand.
-  let detectCandidates = [];
-  let detectIndex = 0;
+  // Two sources, offered together, because neither alone was good enough:
+  //
+  //   Presets. Badge geometry is a small set of ABSOLUTE pixel sizes at
+  //   ABSOLUTE pixel margins from a corner — never a fraction of the image.
+  //   Getting that wrong is what made the old presets land beside the
+  //   watermark on any non-square image.
+  //
+  //   Detection. Searches the corner for something badge-shaped. Useful when
+  //   the geometry is one we don't know, but it can be fooled by ordinary
+  //   image content, so it is a candidate rather than the answer.
+  //
+  // Everything is a ranked proposal the user can step through with "Try next".
+  // Nothing is applied without them seeing it.
+  let candidates = [];
+  let candidateIndex = 0;
 
-  function paintDetected(box) {
+  function paintBox(box) {
     if (!maskCanvas) return;
     maskCanvas.clear();
     const ctx = maskCanvas.ctx;
     ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = 'rgba(255, 64, 192, 0.65)';
-    // Generous margin. Badges are anti-aliased, so their faintest pixels sit
-    // outside the detected box — and in watermark mode over-masking is free:
-    // un-blending solves alpha per pixel, and where alpha is ~0 it returns the
-    // pixel unchanged. Covering a little extra costs nothing and catching the
-    // faint outer tips matters.
+    // Generous margin: badges are anti-aliased, and in watermark mode
+    // over-masking is free — un-blending returns alpha~0 pixels unchanged.
     const pad = Math.max(3, Math.round(Math.max(box.w, box.h) * 0.22));
     ctx.fillRect(box.x - pad, box.y - pad, box.w + pad * 2, box.h + pad * 2);
     D.stageHint.hidden = true;
   }
 
-  function runDetect() {
+  function showCandidate(i) {
+    const c = candidates[i];
+    if (!c) return;
+    paintBox(c);
+    D.btnDetectNext.hidden = candidates.length < 2;
+    const label = c.source === 'preset' ? `preset ${c.profile}` : 'detected';
+    if (D.detectStatus) {
+      D.detectStatus.textContent =
+        `${label} — ${i + 1} of ${candidates.length}. Not right? Try next, or drag your own box.`;
+    }
+  }
+
+  function findWatermark() {
     if (!state.imageData) {
-      showStageModal({ icon: '🖼', title: 'Load a file first', msg: 'Drop an image or video, then run detection.' });
+      showStageModal({ icon: '🖼', title: 'Load a file first', msg: 'Drop an image or video, then find the watermark.' });
       return;
     }
-    const region = D.detectRegion?.value || undefined;
-    const t0 = performance.now();
-    detectCandidates = detectWatermarks(state.imageData, { region });
-    detectIndex = 0;
-    const ms = Math.round(performance.now() - t0);
-    dbg.log(`Detect: ${detectCandidates.length} candidate(s) in ${ms}ms`);
+    const corner = D.detectRegion?.value || 'bottom-right';
+    const { width: W, height: H } = state.imageData;
 
-    if (!detectCandidates.length) {
-      D.btnDetectNext.hidden = true;
+    const detected = detectWatermarks(state.imageData, { region: corner, maxResults: 3 })
+      .map(c => ({ ...c, source: 'detected' }));
+    const presets = presetBoxes(W, H, corner)
+      .map(b => ({ ...b, source: 'preset' }));
+
+    // Detections first when there are any — they are grounded in this actual
+    // image. Presets follow as reliable fallbacks in known-geometry order.
+    candidates = [...detected, ...presets];
+    candidateIndex = 0;
+    dbg.log(`Find: ${detected.length} detected + ${presets.length} preset candidates (${corner})`);
+
+    if (!candidates.length) {
       showStageModal({
-        icon: '🔍',
-        title: 'No watermark found',
-        msg: 'Nothing in this image looked like an overlaid badge. It may be very faint, or somewhere unusual — draw a rectangle over it instead, or narrow the search to one corner and try again.',
+        icon: '🔍', title: 'Nothing to suggest',
+        msg: 'This image is too small for the known badge sizes. Drag a rectangle over the watermark instead.',
       });
       return;
     }
-    paintDetected(detectCandidates[0]);
-    D.btnDetectNext.hidden = detectCandidates.length < 2;
-    toast(
-      detectCandidates.length > 1
-        ? `Found a likely watermark (${detectCandidates.length} candidates). Wrong one? Click "Not it? Try next".`
-        : 'Found a likely watermark. Adjust it with the brush if needed, then Remove.',
-      'success', 5000
-    );
+    showCandidate(0);
+    toast('Placed a suggested mask. Cycle with "Try next", or just drag your own box.', 'info', 5000);
   }
 
-  D.btnDetect?.addEventListener('click', runDetect);
-  D.detectRegion?.addEventListener('change', runDetect);
+  D.btnDetect?.addEventListener('click', findWatermark);
+  D.detectRegion?.addEventListener('change', findWatermark);
   D.btnDetectNext?.addEventListener('click', () => {
-    if (detectCandidates.length < 2) return;
-    detectIndex = (detectIndex + 1) % detectCandidates.length;
-    paintDetected(detectCandidates[detectIndex]);
-    toast(`Candidate ${detectIndex + 1} of ${detectCandidates.length}`, 'info', 2000);
+    if (candidates.length < 2) return;
+    candidateIndex = (candidateIndex + 1) % candidates.length;
+    showCandidate(candidateIndex);
   });
 
   // Hide the "drag a rectangle" hint as soon as the user starts drawing

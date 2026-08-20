@@ -1049,6 +1049,16 @@ body.app-page {
   font-size: 12px;
 }
 
+.detect-status {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: 'DM Mono', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
+}
+
 /* === Debug panel === */
 .debug-toggle {
   position: fixed;
