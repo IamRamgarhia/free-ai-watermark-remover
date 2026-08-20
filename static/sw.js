@@ -11,7 +11,7 @@
  * The AI model is NOT cached here — it lives in IndexedDB (see model-cache.js).
  */
 
-const CACHE_VERSION = 'watermarkout-v1.3.2';
+const CACHE_VERSION = 'watermarkout-v1.3.3';
 
 // Everything needed to render both pages with no network. If you add an asset
 // that either HTML file references, add it here too — otherwise it 404s for
@@ -61,9 +61,21 @@ const CDN_ASSETS = [
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_VERSION);
-    await Promise.all(
-      APP_SHELL.map(url => cache.add(url).catch(err => console.warn('SW cache miss', url, err)))
-    );
+    // `cache: 'reload'` is load-bearing, not a nicety.
+    //
+    // A plain cache.add() goes through the browser's ordinary HTTP cache, so a
+    // fresh install can quietly bake in a STALE copy of an asset — and because
+    // this worker is cache-first, it then serves that stale copy until the next
+    // CACHE_VERSION bump. Observed exactly that: the server had v1.3.2 while a
+    // browser kept serving v1.3.1 from a worker installed moments earlier
+    // against a not-yet-updated CDN edge.
+    //
+    // Forcing a revalidated fetch means a new cache generation always starts
+    // from what the origin actually has right now.
+    const fresh = (url) => cache.add(new Request(url, { cache: 'reload' }))
+      .catch(() => cache.add(url).catch(err => console.warn('SW cache miss', url, err)));
+
+    await Promise.all(APP_SHELL.map(fresh));
     await Promise.all(
       CDN_ASSETS.map(url => cache.add(url).catch(err => console.warn('SW CDN miss', url, err)))
     );
