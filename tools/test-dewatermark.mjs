@@ -192,6 +192,43 @@ test('leaves pixels outside the mask byte-identical', () => {
   }
 });
 
+test('falls back to filling when the mask is not a translucent overlay', () => {
+  // Mask a region that is NOT a translucent overlay at all: a hard, saturated
+  // block. Solving the blend equation here is meaningless, and the danger is
+  // that it writes amplified nonsense. It must route those pixels to the
+  // residual instead.
+  const original = makeOriginal(160, 160);
+  const wm = clone(original);
+  const mask = new ImageData(new Uint8ClampedArray(160 * 160 * 4), 160, 160);
+  for (let y = 60; y < 100; y++) {
+    for (let x = 60; x < 100; x++) {
+      const i = (y * 160 + x) * 4;
+      wm.data[i] = 255; wm.data[i + 1] = 8; wm.data[i + 2] = 250;   // hard magenta
+      mask.data[i + 3] = 255;
+    }
+  }
+  const { result, stats } = unblendWatermark(wm, mask);
+  // Whatever it does, it must not emit pixels that are wildly out of family.
+  let extreme = 0;
+  for (let y = 60; y < 100; y++) {
+    for (let x = 60; x < 100; x++) {
+      const i = (y * 160 + x) * 4;
+      if (mask.data[i + 3] <= 64) continue;
+      // Pixels it chose to keep should be plausible image values, not clipped junk.
+      const isResidual = stats.clamped > 0;
+      for (let c = 0; c < 3; c++) {
+        if (result.data[i + c] === 0 || result.data[i + c] === 255) extreme++;
+      }
+    }
+  }
+  assert(stats.fellBack === true,
+    'should have detected this is not a translucent overlay and fallen back');
+  assert(stats.residualFraction === 1,
+    'the whole mask should be handed to the inpainter, not silently left unchanged');
+  assert(!residualIsNegligible(stats),
+    'must not report the residual as negligible, or nothing would be filled');
+});
+
 test('an empty mask is a no-op', () => {
   const img = makeOriginal(64, 64);
   const empty = new ImageData(new Uint8ClampedArray(64 * 64 * 4), 64, 64);

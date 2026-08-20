@@ -736,11 +736,11 @@ async function runImageRemoval(maskData) {
     recovery = unblendWatermark(state.imageData, maskData);
     source = recovery.result;
     fillMask = recovery.residualMask;
-    dbg.log(
-      `Un-blend: recovered ${recovery.stats.recovered} px, ` +
-      `${recovery.stats.opaque} px too opaque ` +
-      `(${(recovery.stats.residualFraction * 100).toFixed(1)}% needs fill)`
-    );
+    dbg.log(recovery.stats.fellBack
+      ? 'Un-blend: not a translucent overlay — filling the whole mask instead'
+      : `Un-blend: recovered ${recovery.stats.recovered} px, ` +
+        `${recovery.stats.opaque} px too opaque ` +
+        `(${(recovery.stats.residualFraction * 100).toFixed(1)}% needs fill)`);
   }
 
   const needsFill = state.mode !== 'watermark' || !residualIsNegligible(recovery.stats);
