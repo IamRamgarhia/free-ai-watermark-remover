@@ -54,14 +54,19 @@
  * @param {ImageData} imageData  source image
  * @param {ImageData} maskData   same size; alpha > 64 marks the watermark
  * @param {object} [opts]
- * @param {number} [opts.maxAlpha=0.92]  above this the pixel is treated as opaque
+ * @param {number} [opts.maxAlpha=0.85]  above this the pixel is treated as opaque
  * @param {number} [opts.pad=6]          extra context sampled around the mask
  * @returns {{ result: ImageData, residualMask: ImageData, stats: object }}
  *          `result` has the watermark un-blended away; `residualMask` marks the
  *          pixels that were too opaque to recover and still need inpainting.
  */
 export function unblendWatermark(imageData, maskData, opts = {}) {
-  const maxAlpha = opts.maxAlpha ?? 0.92;
+  // Recovery divides by (1 - alpha), so it amplifies any error in the input by
+  // 1/(1-alpha). At alpha 0.85 that is already 6.7x, which turns ordinary JPEG
+  // ringing near an edge into visible speckle; by 0.95 it is 20x and hopeless.
+  // Past this point the honest move is to hand the pixel to the inpainter
+  // rather than to amplify noise and call it detail.
+  const maxAlpha = opts.maxAlpha ?? 0.85;
   const pad = opts.pad ?? 6;
   const { width: W, height: H } = imageData;
 
@@ -108,7 +113,7 @@ export function unblendWatermark(imageData, maskData, opts = {}) {
   // --- Solve for alpha, then invert the blend ------------------------------
   const out = new Uint8ClampedArray(imageData.data);
   const residual = emptyMask(W, H);
-  let recovered = 0, opaque = 0, alphaSum = 0;
+  let recovered = 0, opaque = 0, alphaSum = 0, clampedPx = 0, effective = 0;
 
   for (let y = 0; y < bh; y++) {
     for (let x = 0; x < bw; x++) {
@@ -143,14 +148,59 @@ export function unblendWatermark(imageData, maskData, opts = {}) {
         continue;
       }
 
-      alphaSum += alpha;
-      recovered++;
+      // Recover, but check the result is physically sensible before keeping it.
+      // If the alpha estimate is wrong the division pushes channels far outside
+      // [0,255]; that clamping is the signal that this pixel cannot be trusted.
       const k = 1 - alpha;
+      const rec = [0, 0, 0];
+      let clamped = 0;
       for (let c = 0; c < 3; c++) {
-        out[di + c] = (obs[o * 3 + c] - alpha * wmValue) / k;
+        const v = (obs[o * 3 + c] - alpha * wmValue) / k;
+        if (v < -8 || v > 263) clamped++;
+        rec[c] = v;
       }
+
+      if (clamped > 0) {
+        // Amplified nonsense. Send it to the inpainter instead of writing a
+        // blown-out pixel — a smear is bad, a bright speckle is worse.
+        opaque++;
+        clampedPx++;
+        residual.data[di] = 255;
+        residual.data[di + 1] = 255;
+        residual.data[di + 2] = 255;
+        residual.data[di + 3] = 255;
+        continue;
+      }
+
+      alphaSum += alpha;
+      if (alpha > 0.05) effective++;
+      recovered++;
+      for (let c = 0; c < 3; c++) out[di + c] = rec[c];
       out[di + 3] = 255;
     }
+  }
+
+  // If almost nothing had a meaningful alpha, the mask is not covering a
+  // translucent overlay at all — the user has marked a solid object, or a badge
+  // that is opaque everywhere. Un-blending correctly left those pixels alone,
+  // but then the residual would be empty too, and the caller would skip the
+  // inpainter and show the user an unchanged image. Fall back to handing the
+  // whole mask over to be filled instead.
+  const effectiveFraction = marked ? effective / marked : 0;
+  const fellBack = effectiveFraction < 0.15;
+  if (fellBack) {
+    return {
+      result: imageData,
+      residualMask: maskData,
+      stats: {
+        recovered: 0, opaque: marked, marked, clamped: clampedPx,
+        meanAlpha: recovered ? alphaSum / recovered : 0,
+        watermarkColor: wmValue,
+        effectiveFraction,
+        fellBack: true,
+        residualFraction: 1,
+      },
+    };
   }
 
   return {
@@ -160,8 +210,11 @@ export function unblendWatermark(imageData, maskData, opts = {}) {
       recovered,
       opaque,
       marked,
+      clamped: clampedPx,
       meanAlpha: recovered ? alphaSum / recovered : 0,
       watermarkColor: wmValue,
+      effectiveFraction,
+      fellBack: false,
       // Fraction of the marked area that still needs generative fill.
       residualFraction: marked ? opaque / marked : 0,
     },

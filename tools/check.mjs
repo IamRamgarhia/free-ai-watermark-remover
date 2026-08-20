@@ -260,7 +260,22 @@ const manifest  = JSON.parse(read('manifest.webmanifest'));
   else ok('seo-desc', `meta description is ${desc.length} chars`);
 }
 
-// === 10. Sitemap lastmod present and not absurd ============================
+// === 10. The invisible-watermark disclosure is still there =================
+// Removing a visible badge does NOT remove SynthID / Content Seal, which are
+// encoded across the whole image and survive re-encoding, cropping and
+// screenshots. A tool that quietly implies otherwise is misleading its users
+// about the one thing they most need to know, so this must not get dropped.
+{
+  const required = ['SynthID', 'Content Credentials'];
+  const missing = required.filter(t => !guideHtml.includes(t));
+  if (missing.length) {
+    fail('honesty', `guide.html no longer mentions: ${missing.join(', ')}`);
+  } else {
+    ok('honesty', 'invisible-watermark limits are disclosed');
+  }
+}
+
+// === 11. Sitemap lastmod present and not absurd ============================
 {
   // Strip XML comments first — they document these tag names by name.
   const sitemap = read('sitemap.xml').replace(/<!--[\s\S]*?-->/g, '');

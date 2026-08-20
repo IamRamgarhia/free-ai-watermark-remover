@@ -21,9 +21,25 @@ mask are copied through unchanged.
 
 ## Supported watermarks
 
-One-click presets exist for Google Gemini, OpenAI DALL·E (including the DALL·E 2
-colour bar), Midjourney, Adobe Firefly, Bing Image Creator, Meta AI, and tiled
-stock-photo patterns. Anything else can be masked by hand with a rectangle or brush.
+Detection is structural rather than a table of known logos, so it is not limited to
+a fixed list. Which generators actually stamp a visible badge, as of August 2026:
+
+- Google Gemini / Imagen — yes, bottom-right. Paid tiers can now disable it at source.
+- Grok (xAI) — yes, but xAI's Acceptable Use Policy prohibits removing it.
+- Bing Image Creator / Designer — yes, bottom-left (last confirmed 2024).
+- Meta AI — older images only; newer Meta models watermark invisibly instead.
+- Midjourney — NO. Midjourney has never added a visible watermark on any tier.
+- OpenAI / DALL·E — NO. DALL·E 2 and 3 were retired in May 2026.
+- Adobe Firefly — unclear; reports conflict.
+
+## What removal does not do
+
+Removing a visible badge does not make an image undetectable as AI-generated.
+Google's SynthID (also present on OpenAI images) and Meta's Content Seal are encoded
+across the whole image, not stamped in a corner, and survive cropping, resizing,
+re-compression, screenshots and AI upscaling. Saving from this tool does strip the
+file's C2PA Content Credentials metadata, but that is an unavoidable side effect of
+how browsers export images and does not affect the pixel-level watermark.
 
 ## Supported formats
 

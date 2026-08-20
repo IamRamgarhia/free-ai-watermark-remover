@@ -25,7 +25,7 @@
 
 ---
 
-WatermarkOut removes watermarks from AI-generated images (**Gemini**, **DALL·E**, **Midjourney**, **Bing Image Creator**, **Adobe Firefly**, **Meta AI**) and short videos — **entirely client-side**. The AI model runs in your browser via WebAssembly. Your files never touch any server. There is no server.
+WatermarkOut finds and removes visible watermarks from AI-generated images (**Google Gemini**, **Bing Image Creator**, **Meta AI** and others) and short videos — **entirely client-side**. The AI model runs in your browser via WebAssembly. Your files never touch any server. There is no server.
 
 ---
 
@@ -39,7 +39,7 @@ There are **3 ways** to use WatermarkOut. Detailed steps for each in [**INSTALL.
 
 1. Open the link
 2. Drop in an image or video
-3. Pick a preset (Gemini ✨, DALL·E, Midjourney, etc.) or draw your own rectangle
+3. Click **Detect watermark**, or draw your own rectangle
 4. Click **Remove watermark**
 5. Download the clean file
 
@@ -84,7 +84,7 @@ Most online watermark removers upload your private photos to a server you don't 
 | 🖼 Image watermark removal | JPG, PNG, WEBP, BMP — up to 100 MB |
 | 🎬 Video watermark removal | MP4, WEBM, MOV — audio preserved, real-time playback preview |
 | 🤖 MI-GAN inpainting | Picsart Research ICCV 2023 model, 29 MB |
-| ✨ Watermark presets | Gemini, DALL·E, Midjourney, Bing, Firefly, Meta AI |
+| ⚠️ Honest about limits | Removing the badge does **not** remove SynthID — see the [guide](static/guide.html) |
 | 🔍 Auto watermark detection | Finds the badge instead of assuming where it is |
 | 🎨 Manual masking | Rectangle, brush, eraser, undo — mouse **or** keyboard |
 | ♻️ Recovery, not repaint | Solves for the picture under a see-through watermark |
