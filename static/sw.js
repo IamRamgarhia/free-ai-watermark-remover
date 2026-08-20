@@ -6,12 +6,16 @@
  *      threads + SIMD and WebGPU can run. Without this, ONNX inference
  *      falls back to single-threaded WASM (~10× slower).
  *
- * Bump CACHE_VERSION on every release. Old caches are auto-deleted.
- * The LaMa model is NOT cached here — it lives in IndexedDB (see model-cache.js).
+ * Bump CACHE_VERSION on every release — it must match APP_VERSION in
+ * js/version.js (tools/check.mjs enforces this). Old caches are auto-deleted.
+ * The AI model is NOT cached here — it lives in IndexedDB (see model-cache.js).
  */
 
-const CACHE_VERSION = 'watermarkout-v2.1.0';
+const CACHE_VERSION = 'watermarkout-v1.1.0';
 
+// Everything needed to render both pages with no network. If you add an asset
+// that either HTML file references, add it here too — otherwise it 404s for
+// installed-PWA users who go offline before happening to load it once.
 const APP_SHELL = [
   './',
   './index.html',
@@ -21,6 +25,7 @@ const APP_SHELL = [
   './css/app.css',
   './css/about.css',
   './js/app.js',
+  './js/about.js',
   './js/upload.js',
   './js/mask.js',
   './js/inpainter.js',
@@ -34,8 +39,11 @@ const APP_SHELL = [
   './js/fs-folder.js',
   './assets/logo.svg',
   './assets/logo-icon.svg',
+  './assets/hero-illustration.svg',
+  './assets/social-preview.png',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
+  './assets/icons/icon-maskable.png',
 ];
 
 // External CDN deps
@@ -77,6 +85,11 @@ function withCOIHeaders(response) {
   headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
   headers.set('Cross-Origin-Opener-Policy', 'same-origin');
   headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
+  // frame-ancestors can only be set as a real header, never via <meta>, so the
+  // anti-clickjacking rule lives here while the resource directives live in the
+  // pages' <meta> CSP (which also covers the very first load, before this SW is
+  // active). Two policies both apply — the browser enforces the intersection.
+  headers.set('Content-Security-Policy', "frame-ancestors 'none'");
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -116,8 +129,18 @@ async function cacheFirstWithCOI(req) {
     if (res.ok) cache.put(req, res.clone());
     return withCOIHeaders(res);
   } catch {
-    const fallback = await cache.match('./offline.html');
-    return withCOIHeaders(fallback || new Response('Offline', { status: 503 }));
+    // Only a page navigation should fall back to offline.html. Returning HTML
+    // for a failed image/script/JSON request just produces a confusing parse
+    // error instead of an honest network failure.
+    if (req.mode === 'navigate') {
+      const fallback = await cache.match('./offline.html');
+      if (fallback) return withCOIHeaders(fallback);
+    }
+    return new Response('Offline', {
+      status: 503,
+      statusText: 'Offline',
+      headers: { 'Content-Type': 'text/plain' },
+    });
   }
 }
 

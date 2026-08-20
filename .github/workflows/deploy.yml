@@ -1,4 +1,4 @@
-# Auto-deploys the static/ folder to GitHub Pages on every push to main.
+# Verifies the site, then deploys static/ to GitHub Pages on every push to main.
 #
 # After enabling this workflow:
 #   1. Repo Settings → Pages → Source: "GitHub Actions"
@@ -12,6 +12,8 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -24,7 +26,32 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Gate: the pixel math and the cross-file consistency checks must pass before
+  # anything ships. This runs on pull requests too, so a regression is caught
+  # before it reaches main rather than after it is already live.
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      # No dependencies, no install step — both scripts are plain ESM.
+      - name: Inpainter pixel-math tests
+        run: node tools/test-inpainter.mjs
+      - name: Static consistency checks
+        run: node tools/check.mjs
+      - name: Syntax-check every module
+        run: |
+          for f in static/js/*.js static/sw.js; do
+            node --input-type=module --check < "$f" || exit 1
+          done
+          echo "All modules parse."
+
   deploy:
+    needs: verify
+    # Pull requests only get the verify gate; deploys happen on main.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     env:
       # Future-proof: GitHub deprecates Node 20 for actions on June 2, 2026.

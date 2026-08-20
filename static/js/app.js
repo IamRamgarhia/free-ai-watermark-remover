@@ -4,8 +4,8 @@
  */
 
 import { APP_VERSION } from './version.js';
-import { bindDropzone, imageToImageData, downloadCanvas } from './upload.js';
-import { MaskCanvas, dilateMask } from './mask.js';
+import { bindDropzone, imageToImageData } from './upload.js';
+import { MaskCanvas, dilateMask, maskHasContent } from './mask.js';
 import * as inpainter from './inpainter.js';
 import { registerServiceWorker } from './updates.js';
 import { toast } from './toast.js';
@@ -60,7 +60,6 @@ const D = {
   fileInfoCard: document.getElementById('file-info-card'),
   qualityCard: document.getElementById('quality-card'),
   actionsCard: document.getElementById('actions-card'),
-  privacyNote: document.getElementById('privacy-note'),
   fileName: document.getElementById('file-name'),
   fileDims: document.getElementById('file-dims'),
   fileSize: document.getElementById('file-size'),
@@ -106,10 +105,6 @@ const D = {
   maskExpand: document.getElementById('mask-expand'),
   maskExpandVal: document.getElementById('mask-expand-val'),
   outputFormat: document.getElementById('output-format'),
-
-  progressBar: document.getElementById('progress-bar'),
-  progressFill: document.getElementById('progress-fill'),
-  progressLabel: document.getElementById('progress-label'),
 
   toolBtns: document.querySelectorAll('.tool-btn[data-tool]'),
 };
@@ -166,10 +161,13 @@ async function bootstrap() {
   dbg.set('model', cachedAlready ? 'cached' : 'downloading', cachedAlready ? 'ok' : 'warn');
   refreshStorageStatus();
 
-  // SW + coverage poll, fire-and-forget
   registerServiceWorker();
+
+  // Coverage readout for the debug panel. getCoveragePercent() does a full
+  // getImageData() — on a 4000×3000 image that's a ~48 MB pixel copy — so it
+  // only runs while the panel is actually open, not for the whole session.
   setInterval(() => {
-    if (maskCanvas) {
+    if (maskCanvas && dbg.isOpen()) {
       const pct = maskCanvas.getCoveragePercent();
       dbg.setIfChanged('coverage', `${pct.toFixed(2)}%`, pct > 0 ? 'ok' : '');
     }
@@ -291,10 +289,13 @@ async function onFileLoaded({ file, image, kind, error }) {
     return;
   }
 
+  // Free the previous file's blob URLs before we overwrite them — a new file
+  // can be dropped while the editor is still open.
+  releaseVideoUrls();
+
   state.filename = file.name;
   state.kind = kind;
   state.resultData = null;
-  state.videoBlob = null;
   state.showResult = false;
 
   dbg.set('file', file.name);
@@ -456,11 +457,35 @@ function fitCanvasToStage() {
   }
 }
 
-function resetToDropzone() {
-  // Free up video object URL if any
+/**
+ * Revoke every object URL the video pipeline currently holds.
+ *
+ * Must run before loading a new file, not just on reset: the window-level drop
+ * handler lets you drop a second file while the editor is already open, and
+ * without this the previous video's source blob (and any processed result)
+ * stays pinned in memory for the lifetime of the tab.
+ */
+function releaseVideoUrls() {
   if (state.videoInfo?.revoke) {
     try { state.videoInfo.revoke(); } catch {}
   }
+  state.videoInfo = null;
+  state.videoBlob = null;
+
+  for (const el of [D.videoResult, D.videoOriginal]) {
+    if (!el) continue;
+    try { el.pause(); } catch {}
+    // videoOriginal shares videoInfo.url, which revoke() above already handled;
+    // revoking the same URL twice is a harmless no-op.
+    if (el.src && el.src.startsWith('blob:')) URL.revokeObjectURL(el.src);
+    el.removeAttribute('src');
+    el.load();
+    el.hidden = true;
+  }
+}
+
+function resetToDropzone() {
+  releaseVideoUrls();
 
   state.kind = null;
   state.image = null;
@@ -485,21 +510,6 @@ function resetToDropzone() {
   }
   D.canvasMask.style.opacity = '1';
   D.canvasMask.style.pointerEvents = 'auto';
-
-  // Tear down any video preview elements
-  if (D.videoResult) {
-    D.videoResult.pause();
-    if (D.videoResult.src) URL.revokeObjectURL(D.videoResult.src);
-    D.videoResult.removeAttribute('src');
-    D.videoResult.load();
-    D.videoResult.hidden = true;
-  }
-  if (D.videoOriginal) {
-    D.videoOriginal.pause();
-    D.videoOriginal.removeAttribute('src');
-    D.videoOriginal.load();
-    D.videoOriginal.hidden = true;
-  }
 
   // Reset UI state
   D.dropzone.hidden = false;
@@ -559,14 +569,6 @@ async function runRemoval() {
   dbg.set('removes', String(state.removeClickCount));
   dbg.log(`Remove clicked #${state.removeClickCount}`);
 
-  console.log('[remove] clicked. state:', {
-    kind: state.kind,
-    hasImage: !!state.imageData,
-    hasMask: maskCanvas?.hasContent(),
-    coverage: maskCanvas?.getCoveragePercent().toFixed(2) + '%',
-    quality: state.quality,
-  });
-
   // 1. INSTANT visual feedback
   D.btnRemove.classList.add('loading');
 
@@ -577,7 +579,22 @@ async function runRemoval() {
     dbg.warn('No imageData when Remove clicked');
     return;
   }
-  if (!maskCanvas || !maskCanvas.hasContent()) {
+
+  // Read the mask ONCE. getImageData() copies the whole canvas, so the old
+  // hasContent() → getCoveragePercent() → getMaskImageData() sequence was
+  // three full-resolution pixel copies before any work started.
+  let rawMask = null;
+  if (maskCanvas) {
+    try {
+      rawMask = maskCanvas.getMaskImageData();
+    } catch (e) {
+      D.btnRemove.classList.remove('loading');
+      dbg.error('Could not read mask: ' + (e.message || e));
+      showStageModal({ icon: '❌', title: 'Could not read the mask', msg: String(e.message || e) });
+      return;
+    }
+  }
+  if (!rawMask || !maskHasContent(rawMask)) {
     D.btnRemove.classList.remove('loading');
     showStageModal({
       icon: '✏️',
@@ -587,6 +604,14 @@ async function runRemoval() {
     dbg.warn('Mask is empty when Remove clicked');
     return;
   }
+
+  console.log('[remove] clicked. state:', {
+    kind: state.kind,
+    hasImage: !!state.imageData,
+    quality: state.quality,
+    passes: inpainter.getPassCount(state.quality),
+  });
+
   if (!(await inpainter.isReady())) {
     D.btnRemove.classList.remove('loading');
     showStageModal({ icon: '⏳', title: 'AI model still loading', msg: 'Give it a few more seconds and try again.' });
@@ -605,11 +630,10 @@ async function runRemoval() {
   D.stageHint.hidden = true;
   setStatus('Processing', 'busy');
 
-  // Compute mask once
+  // Expand the mask (already read above — no second getImageData).
   let maskData;
   try {
-    maskData = maskCanvas.getMaskImageData();
-    if (state.maskExpand > 0) maskData = dilateMask(maskData, state.maskExpand);
+    maskData = state.maskExpand > 0 ? dilateMask(rawMask, state.maskExpand) : rawMask;
   } catch (e) {
     D.processingOverlay.hidden = true;
     D.btnRemove.classList.remove('loading');
@@ -618,11 +642,12 @@ async function runRemoval() {
     return;
   }
 
-  // Estimate. For images: just the one inference.
-  // For videos: 1 inference (first frame) + ~1.5× video duration for seeking+composite.
-  // This is the static-mask optimization — only one AI call per video.
+  // Estimate. Scales with the number of model runs the chosen quality costs
+  // ("Best" is a two-pass coarse-to-fine refine, so it's ~2× "Balanced").
+  // For videos: the AI runs once on the first frame (static-mask optimization),
+  // then ~1.5× video duration for seeking + compositing every frame.
   const isWebGPU = inpainter.getBackend() === 'webgpu';
-  const baseTime = isWebGPU ? 3 : 20;
+  const baseTime = (isWebGPU ? 3 : 20) * inpainter.getPassCount(state.quality);
   const expected = state.kind === 'video'
     ? baseTime + Math.ceil(state.videoInfo.duration * 1.5)
     : baseTime;
@@ -661,7 +686,13 @@ async function runRemoval() {
 
 async function runImageRemoval(maskData) {
   const t0 = performance.now();
-  const result = await inpainter.inpaint(state.imageData, maskData, { quality: state.quality, featherRadius: 4 });
+  // featherRadius is intentionally not passed — it comes from the quality preset.
+  const result = await inpainter.inpaint(state.imageData, maskData, {
+    quality: state.quality,
+    onPass: (i, total) => {
+      if (total > 1) D.processingStage.textContent = `Refining — AI pass ${i + 1} of ${total}`;
+    },
+  });
   const tMs = Math.round(performance.now() - t0);
 
   state.resultData = result;
@@ -688,7 +719,7 @@ async function runVideoRemoval(maskData) {
 
   // Frame-by-frame inpaint function: receives a frame ImageData, returns processed.
   const inpaintFrame = async (frameImg) => {
-    return await inpainter.inpaint(frameImg, maskData, { quality: state.quality, featherRadius: 4 });
+    return await inpainter.inpaint(frameImg, maskData, { quality: state.quality });
   };
 
   // Honor user's chosen video format preference
@@ -716,7 +747,11 @@ async function runVideoRemoval(maskData) {
 
   state.videoBlob = blob;
 
-  // Set up the result video element with the processed blob
+  // Set up the result video element with the processed blob. Revoke any
+  // previous result first — Remove can be clicked more than once per file.
+  if (D.videoResult.src && D.videoResult.src.startsWith('blob:')) {
+    URL.revokeObjectURL(D.videoResult.src);
+  }
   const resultUrl = URL.createObjectURL(blob);
   D.videoResult.src = resultUrl;
   D.videoResult.load();
@@ -854,8 +889,12 @@ function bindUI() {
 
   D.toolBtns.forEach(b => {
     b.addEventListener('click', () => {
-      D.toolBtns.forEach(x => x.classList.remove('active'));
+      D.toolBtns.forEach(x => {
+        x.classList.remove('active');
+        x.setAttribute('aria-pressed', 'false');
+      });
       b.classList.add('active');
+      b.setAttribute('aria-pressed', 'true');   // .active is CSS-only; screen readers need this
       state.tool = b.dataset.tool;
       maskCanvas?.setTool(state.tool);
       dbg.set('tool', state.tool);
@@ -894,8 +933,18 @@ function bindUI() {
     D.maskExpandVal.textContent = `${state.maskExpand} px`;
   });
 
+  const QUALITY_HINTS = {
+    fast:     'Fast — one AI pass, tight crop. Sharpest detail, least context.',
+    balanced: 'Balanced — one AI pass, wide context.',
+    best:     'Best — two AI passes (structure, then sharpen). ~2× slower.',
+  };
+  const qualityHint = document.getElementById('quality-hint');
   document.querySelectorAll('input[name="quality"]').forEach(r => {
-    r.addEventListener('change', () => { state.quality = r.value; });
+    r.addEventListener('change', () => {
+      state.quality = r.value;
+      if (qualityHint) qualityHint.textContent = QUALITY_HINTS[r.value] || '';
+      dbg.set('quality', r.value);
+    });
   });
 
   D.outputFormat.addEventListener('change', () => { state.outputFormat = D.outputFormat.value; });
@@ -920,7 +969,7 @@ function bindUI() {
   //
   // Coordinates as fractions of the image dimensions: (x, y) = top-left corner
   // of the mask rect, (w, h) = mask size. Tuned to match real watermark sizes
-  // on a 1024×1024 reference image. Tight masks = cleaner LaMa output.
+  // on a 1024×1024 reference image. Tight masks = cleaner MI-GAN output.
   //
   // Each preset also has a `shape` — 'rounded' draws a rounded-rect (matches
   // most AI logo badges); 'rect' is a plain rectangle.
@@ -1023,10 +1072,17 @@ function bindUI() {
     D.stageHint.hidden = true;
   });
 
+  // Relay keyboard-masking feedback to the aria-live region.
+  const maskStatus = document.getElementById('mask-status');
+  document.addEventListener('mask:announce', (e) => {
+    if (maskStatus) maskStatus.textContent = e.detail?.message || '';
+    D.stageHint.hidden = true;
+  });
+
   D.btnPickFolder?.addEventListener('click', onPickFolder);
 
   D.btnClearModel?.addEventListener('click', async () => {
-    if (!confirm('Delete the cached AI model from your device? It\'ll re-download (~200 MB) next time you open the app.')) return;
+    if (!confirm('Delete the cached AI model from your device? It\'ll re-download (~29 MB) next time you open the app.')) return;
     const ok = await clearModel();
     if (ok) {
       toast('Cached model deleted. Refresh the page to download a fresh copy.', 'success', 5000);
@@ -1046,6 +1102,11 @@ function bindUI() {
     if (t && typeof t.tagName === 'string') {
       if (t.tagName === 'INPUT' && t.type !== 'range' && t.type !== 'radio' && t.type !== 'checkbox') return;
       if (t.tagName === 'TEXTAREA') return;
+    }
+    // The mask canvas owns arrows/Enter/Space for keyboard drawing — don't let
+    // Space also fire the compare toggle while someone is drawing.
+    if (t === D.canvasMask && (e.key === ' ' || e.key === 'Enter' || e.key.startsWith('Arrow'))) {
+      return;
     }
 
     const key = e.key.toLowerCase();

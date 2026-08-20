@@ -110,17 +110,6 @@ export function imageToImageData(img) {
   return ctx.getImageData(0, 0, canvas.width, canvas.height);
 }
 
-export function downloadCanvas(canvas, filename, format = 'png') {
-  const mime = format === 'jpg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png';
-  const quality = format === 'png' ? undefined : 0.95;
-  canvas.toBlob((blob) => {
-    if (!blob) return;
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-  }, mime, quality);
-}
+// NOTE: a downloadCanvas() helper used to live here but nothing called it —
+// app.js's downloadResult() owns saving, because it also has to handle the
+// File System Access folder path before falling back to a browser download.

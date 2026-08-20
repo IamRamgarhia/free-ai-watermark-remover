@@ -5,6 +5,7 @@ desktop.ini
 .vscode/
 .idea/
 .vs/
+.claude/
 *.swp
 *.swo
 *~

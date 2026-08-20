@@ -26,32 +26,46 @@ export class MaskCanvas {
     this.undoStack = [];
     this.maxUndo = 20;
 
+    // --- Keyboard masking state ---
+    // The canvas is the only way to draw a custom mask, so it has to be
+    // operable without a pointer. A virtual cursor is moved with the arrow
+    // keys and committed with Enter. The crosshair is drawn ONTO the mask
+    // canvas (there is no second overlay), so `kbSnapshot` holds the clean
+    // mask underneath it and every mask read restores that first — otherwise
+    // the crosshair itself would be inpainted.
+    this.kbCursor = null;    // {x, y} in canvas pixel coords
+    this.kbAnchor = null;    // {x, y} pending rectangle corner
+    this.kbSnapshot = null;  // clean mask while the overlay is visible
+
     this._bindEvents();
   }
 
   resize(w, h) {
+    // Resizing blows away the backing store, so drop the stale overlay state.
+    this.kbSnapshot = null;
+    this.kbCursor = null;
+    this.kbAnchor = null;
     this.canvas.width = w;
     this.canvas.height = h;
     this.clear();
   }
 
-  setTool(tool) { this.tool = tool; }
-  setBrushSize(px) { this.brushSize = Math.max(1, Math.round(px)); }
-
-  clear() {
-    this._pushUndo();
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+  setTool(tool) {
+    this.tool = tool;
+    this.kbAnchor = null;          // a half-drawn rect doesn't survive a tool switch
+    if (this.kbSnapshot) this._drawKbOverlay();
   }
 
-  hasContent() {
-    const { width: w, height: h } = this.canvas;
-    if (w === 0 || h === 0) return false;
-    // Sample every 4th pixel for reliable detection of small marks.
-    const data = this.ctx.getImageData(0, 0, w, h).data;
-    for (let i = 3; i < data.length; i += 16) {
-      if (data[i] > 16) return true;
-    }
-    return false;
+  setBrushSize(px) {
+    this.brushSize = Math.max(1, Math.round(px));
+    if (this.kbSnapshot) this._drawKbOverlay();
+  }
+
+  clear() {
+    this._hideKbOverlay();
+    this._pushUndo();
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.kbAnchor = null;
   }
 
   /**
@@ -61,6 +75,7 @@ export class MaskCanvas {
   getCoveragePercent() {
     const { width: w, height: h } = this.canvas;
     if (w === 0 || h === 0) return 0;
+    this._hideKbOverlay();
     const data = this.ctx.getImageData(0, 0, w, h).data;
     let masked = 0;
     let sampled = 0;
@@ -74,6 +89,8 @@ export class MaskCanvas {
 
   undo() {
     if (this.undoStack.length === 0) return;
+    this.kbSnapshot = null;   // the restored state replaces whatever was under the overlay
+    this.kbAnchor = null;
     const snap = this.undoStack.pop();
     this.ctx.putImageData(snap, 0, 0);
   }
@@ -82,6 +99,7 @@ export class MaskCanvas {
    * Return the current mask as a fresh ImageData (alpha channel = mask).
    */
   getMaskImageData() {
+    this._hideKbOverlay();
     return this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
   }
 
@@ -94,6 +112,153 @@ export class MaskCanvas {
     c.addEventListener('pointerleave', (e) => this._onUp(e));
     // prevent context menu so right-click pan doesn't fight
     c.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    c.addEventListener('keydown', (e) => this._onKeyDown(e));
+    c.addEventListener('blur', () => this._hideKbOverlay());
+  }
+
+  // === Keyboard masking =====================================================
+
+  /** Announce state changes to the aria-live region wired up in app.js. */
+  _announce(message) {
+    this.canvas.dispatchEvent(
+      new CustomEvent('mask:announce', { detail: { message }, bubbles: true })
+    );
+  }
+
+  /** Restore the clean mask, discarding the crosshair overlay. Idempotent. */
+  _hideKbOverlay() {
+    if (!this.kbSnapshot) return;
+    this.ctx.putImageData(this.kbSnapshot, 0, 0);
+    this.kbSnapshot = null;
+  }
+
+  /** Redraw the crosshair (and any pending rectangle) over a clean mask. */
+  _drawKbOverlay() {
+    if (!this.kbCursor) return;
+    const { width: w, height: h } = this.canvas;
+    if (w <= 1 || h <= 1) return;
+
+    this._hideKbOverlay();
+    this.kbSnapshot = this.ctx.getImageData(0, 0, w, h);
+
+    const ctx = this.ctx;
+    const { x, y } = this.kbCursor;
+    // Scale the indicator with image size so it stays visible on a 4K photo
+    // and doesn't swamp a thumbnail.
+    const lw = Math.max(1, Math.round(Math.min(w, h) / 400));
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+
+    // Pending rectangle preview
+    if (this.kbAnchor) {
+      ctx.fillStyle = MASK_COLOR;
+      ctx.fillRect(
+        Math.min(this.kbAnchor.x, x), Math.min(this.kbAnchor.y, y),
+        Math.abs(x - this.kbAnchor.x), Math.abs(y - this.kbAnchor.y)
+      );
+    }
+
+    // Crosshair — white core with a dark halo so it reads on any background
+    for (const [color, width] of [['rgba(0,0,0,0.85)', lw * 3], ['rgba(255,255,255,0.95)', lw]]) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      ctx.moveTo(x, 0); ctx.lineTo(x, h);
+      ctx.moveTo(0, y); ctx.lineTo(w, y);
+      ctx.stroke();
+      // Brush tools also show the radius they'd paint
+      if (this.tool === 'brush' || this.tool === 'erase') {
+        ctx.beginPath();
+        ctx.arc(x, y, this.brushSize / 2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  _onKeyDown(e) {
+    const { width: w, height: h } = this.canvas;
+    if (w <= 1 || h <= 1) return;
+
+    // Start the cursor in the middle on first use.
+    if (!this.kbCursor) {
+      this.kbCursor = { x: Math.round(w / 2), y: Math.round(h / 2) };
+    }
+
+    // Step size: 2% of the image normally, 10% with Shift, 1px with Alt.
+    const base = Math.max(1, Math.round(Math.min(w, h) * 0.02));
+    const step = e.altKey ? 1 : e.shiftKey ? base * 5 : base;
+
+    // Arrow keys only move the cursor — painting is always an explicit Enter,
+    // so a user exploring the image can never accidentally alter the mask.
+    const move = (dx, dy) => {
+      this.kbCursor.x = Math.max(0, Math.min(w, this.kbCursor.x + dx));
+      this.kbCursor.y = Math.max(0, Math.min(h, this.kbCursor.y + dy));
+      this._drawKbOverlay();
+    };
+
+    switch (e.key) {
+      case 'ArrowLeft':  e.preventDefault(); move(-step, 0); return;
+      case 'ArrowRight': e.preventDefault(); move(step, 0);  return;
+      case 'ArrowUp':    e.preventDefault(); move(0, -step); return;
+      case 'ArrowDown':  e.preventDefault(); move(0, step);  return;
+
+      case 'Enter':
+      case ' ': {
+        e.preventDefault();
+        this._kbCommit();
+        return;
+      }
+
+      case 'Escape': {
+        if (this.kbAnchor) {
+          e.preventDefault();
+          e.stopPropagation();   // don't let app.js treat this as "start over"
+          this.kbAnchor = null;
+          this._drawKbOverlay();
+          this._announce('Rectangle cancelled.');
+        }
+        return;
+      }
+    }
+  }
+
+  /** Enter/Space: place a brush dab, or set/complete a rectangle. */
+  _kbCommit() {
+    const { x, y } = this.kbCursor;
+
+    if (this.tool === 'rect') {
+      if (!this.kbAnchor) {
+        this.kbAnchor = { x, y };
+        this._drawKbOverlay();
+        this._announce(
+          `Corner set at ${Math.round(x)}, ${Math.round(y)}. ` +
+          `Move with the arrow keys and press Enter again to complete the rectangle.`
+        );
+        return;
+      }
+      const ax = this.kbAnchor.x, ay = this.kbAnchor.y;
+      this.kbAnchor = null;
+      this._hideKbOverlay();
+      this._pushUndo();
+      this._drawRect(ax, ay, x, y);
+      this._announce(
+        `Rectangle drawn, ${Math.round(Math.abs(x - ax))} by ${Math.round(Math.abs(y - ay))} pixels.`
+      );
+      this._drawKbOverlay();
+      return;
+    }
+
+    // Brush / eraser: stamp a single dab at the cursor.
+    this._hideKbOverlay();
+    this._pushUndo();
+    this._drawCircle(x, y, this.brushSize / 2);
+    this._announce(
+      `${this.tool === 'erase' ? 'Erased' : 'Painted'} at ${Math.round(x)}, ${Math.round(y)}.`
+    );
+    this._drawKbOverlay();
   }
 
   _getCoords(e) {
@@ -106,6 +271,7 @@ export class MaskCanvas {
 
   _pushUndo() {
     if (this.canvas.width === 0 || this.canvas.height === 0) return;
+    this._hideKbOverlay();   // never snapshot the crosshair into undo history
     try {
       const snap = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
       this.undoStack.push(snap);
@@ -117,6 +283,9 @@ export class MaskCanvas {
 
   _onDown(e) {
     if (e.button !== 0) return;
+    // Pointer takes over: drop the keyboard crosshair so it can't be baked in.
+    this._hideKbOverlay();
+    this.kbAnchor = null;
     this.canvas.setPointerCapture(e.pointerId);
     this._pushUndo();
     this.isDrawing = true;
@@ -182,6 +351,24 @@ export class MaskCanvas {
     const h = Math.abs(y2 - y1);
     this.ctx.fillRect(x, y, w, h);
   }
+}
+
+/**
+ * True if a mask ImageData has any painted pixels (alpha > 16).
+ *
+ * Takes an already-read ImageData rather than reading the canvas itself, so
+ * callers that need the buffer anyway don't pay for a second getImageData().
+ * Samples every 4th pixel — enough to catch even a small brush dab.
+ *
+ * @param {{data:Uint8ClampedArray|Uint8Array}} maskImageData
+ */
+export function maskHasContent(maskImageData) {
+  const data = maskImageData?.data;
+  if (!data) return false;
+  for (let i = 3; i < data.length; i += 16) {
+    if (data[i] > 16) return true;
+  }
+  return false;
 }
 
 /**

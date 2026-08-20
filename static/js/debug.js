@@ -34,6 +34,7 @@ const rows = {
   dims:     $('dbg-dims'),
   coverage: $('dbg-coverage'),
   tool:     $('dbg-tool'),
+  quality:  $('dbg-quality'),
   removes:  $('dbg-removes'),
   action:   $('dbg-action'),
   error:    $('dbg-error'),
@@ -44,6 +45,7 @@ const MAX_LOG = 200;
 
 function show() { els.panel?.removeAttribute('hidden'); }
 function hide() { els.panel?.setAttribute('hidden', ''); }
+function isOpen() { return !!els.panel && !els.panel.hasAttribute('hidden'); }
 function toggle() {
   if (!els.panel) return;
   if (els.panel.hasAttribute('hidden')) show();
@@ -77,7 +79,7 @@ export const dbg = {
     const el = rows[key];
     if (el && el.textContent !== String(value)) setRow(key, value, cls);
   },
-  show, hide, toggle,
+  show, hide, toggle, isOpen,
 };
 
 // Wire up toggle + close

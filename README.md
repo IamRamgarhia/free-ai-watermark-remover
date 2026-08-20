@@ -85,7 +85,8 @@ Online watermark removers charge ₹800–₹2,500 / month ($10–$30), upload y
 | 🎬 Video watermark removal | MP4, WEBM, MOV — audio preserved, real-time playback preview |
 | 🤖 MI-GAN inpainting | Picsart Research ICCV 2023 model, 29 MB |
 | ✨ Watermark presets | Gemini, DALL·E, Midjourney, Bing, Firefly, Meta AI |
-| 🎨 Manual masking | Rectangle, brush, eraser, undo |
+| 🎨 Manual masking | Rectangle, brush, eraser, undo — mouse **or** keyboard |
+| ⚙️ Quality control | Fast / Balanced / Best — Best runs a 2-pass coarse-to-fine refine |
 | 🔄 BEFORE/AFTER compare | Toggle to see original vs cleaned |
 | 🔒 100% offline AI | After first load, zero outbound requests |
 | 📱 Installable PWA | Desktop icon, standalone window, offline support |
@@ -124,6 +125,7 @@ Online watermark removers charge ₹800–₹2,500 / month ($10–$30), upload y
 - Exported to ONNX (29 MB) and hosted on [Hugging Face](https://huggingface.co/lxfater/inpaint-web/blob/main/migan.onnx).
 - Runs via [ONNX Runtime Web](https://onnxruntime.ai/docs/tutorials/web/) with WebGPU → WebGL → WASM fallback chain.
 - Cached in IndexedDB after first download — never re-downloads.
+- Pinned by SHA-256. The model comes from a third-party repo and is then executed, so the bytes are verified before use (and before caching). A mismatch aborts the load rather than running unknown code.
 
 **The pipeline** (matches Picsart's official Python `demo.py`):
 
@@ -134,9 +136,29 @@ Online watermark removers charge ₹800–₹2,500 / month ($10–$30), upload y
 5. Run model. Output is `[-1, 1]` float32; map to `[0, 255]` via `(v * 0.5 + 0.5) * 255`.
 6. Composite into original at full resolution — only masked pixels are replaced, rest stays pixel-identical.
 
+**What the Quality setting actually does**
+
+The model input is fixed at 512×512, so the *crop size* is what decides how much
+of that fixed budget lands on the watermark. A tighter crop is upscaled into the
+model, spending more capacity on the area you care about; a wider crop gives the
+GAN more surrounding texture to match against.
+
+| Setting | Crop | Model runs |
+|---|---|---|
+| Fast | 2× the mask — tightest, sharpest detail | 1 |
+| Balanced | 3× the mask — best structural blending | 1 |
+| Best | 3× then 1.8× — coarse pass for structure, fine pass to sharpen | 2 (~2× slower) |
+
 **Cross-Origin Isolation**
 
 A service worker injects COOP / COEP headers so the page is `crossOriginIsolated`. This unlocks WebAssembly multi-threading + SIMD + WebGPU. Without it, inference is single-threaded WASM (~5× slower).
+
+**Content Security Policy**
+
+Both pages ship a CSP that pins which origins may serve code and data, and the
+ONNX runtime is loaded with a Subresource Integrity hash. `script-src` allows
+`blob:` because ONNX Runtime runs inference in a Worker it builds at runtime —
+without it the WASM backend fails outright.
 
 ---
 
@@ -174,6 +196,30 @@ There is **no build step**. No Node, no npm, no bundler. Edit a file, refresh, s
 - `Ctrl+R` — pick up code changes (preserves the cached AI model)
 - `Ctrl+Shift+R` — hard refresh (bypasses Service Worker; will redownload model)
 
+> The Service Worker is **cache-first**. If an edit doesn't seem to take effect,
+> it's serving the cached copy — use DevTools → Application → Service Workers →
+> *Unregister*, or bump `CACHE_VERSION` in `sw.js`.
+
+### Tests
+
+Two scripts, no dependencies and nothing to install — plain Node:
+
+```bash
+node tools/test-inpainter.mjs   # pixel-math regression tests
+node tools/check.mjs            # cross-file consistency checks
+```
+
+`test-inpainter.mjs` covers the tensor math (mask polarity, `[-1,1]`
+normalization, planar CHW layout, bbox detection). That code fails *silently*
+when it breaks — wrong colours or a bleed-through watermark, never an
+exception — so it's the one part that genuinely needs tests.
+
+`check.mjs` catches the drift a no-build-step project can't otherwise notice:
+version strings disagreeing across four files, assets referenced but missing
+from the Service Worker precache, stale repo links, external scripts without an
+integrity hash, and `getElementById()` calls pointing at markup that doesn't
+exist. Both run in CI on every push and pull request.
+
 ---
 
 ## ⌨️ Keyboard shortcuts
@@ -187,6 +233,22 @@ There is **no build step**. No Node, no npm, no bundler. Edit a file, refresh, s
 | **Ctrl+Z** | Undo brush stroke |
 | **Esc** | Start over (with confirm) |
 | **D** | Download result |
+| **`** | Toggle the diagnostics panel |
+
+### Drawing a mask without a mouse
+
+Tab to the canvas (or click it once) and the mask becomes fully keyboard-operable:
+
+| Key | Action |
+|---|---|
+| **Arrow keys** | Move the crosshair (2% of the image per press) |
+| **Shift + Arrow** | Move in large steps (10%) |
+| **Alt + Arrow** | Move one pixel at a time |
+| **Enter** | Rect tool: set a corner, then press again to complete. Brush/eraser: stamp at the crosshair |
+| **Esc** | Cancel a half-drawn rectangle |
+
+Every action is announced to screen readers, and arrow keys only ever move the
+crosshair — the mask changes only on an explicit **Enter**.
 
 ---
 
@@ -215,12 +277,15 @@ There is **no build step**. No Node, no npm, no bundler. Edit a file, refresh, s
 ## 📁 Project structure
 
 ```
-watermarkout/
+free-ai-watermark-remover/
 ├── README.md
 ├── LICENSE
 ├── CONTRIBUTING.md
 ├── WATERMARKOUT_BUILD_SPEC.md
 ├── .gitignore
+├── tools/                   ← dev-only, never deployed
+│   ├── test-inpainter.mjs   pixel-math regression tests
+│   └── check.mjs            cross-file consistency checks
 └── static/                  ← deploy this folder
     ├── index.html           main app
     ├── about.html           about page (DiceCodes branding)
@@ -232,6 +297,7 @@ watermarkout/
     │   └── about.css
     ├── js/
     │   ├── app.js               main controller
+    │   ├── about.js             about-page behaviour
     │   ├── coi-bootstrap.js     enables Cross-Origin Isolation
     │   ├── inpainter.js         MI-GAN ONNX inference
     │   ├── model-cache.js       IndexedDB model caching
