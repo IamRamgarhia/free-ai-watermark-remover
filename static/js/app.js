@@ -7,7 +7,7 @@ import { APP_VERSION } from './version.js';
 import { bindDropzone, imageToImageData } from './upload.js';
 import { MaskCanvas, dilateMask, maskHasContent } from './mask.js';
 import * as inpainter from './inpainter.js';
-import { detectWatermarks, presetBoxes } from './watermark-detect.js';
+import { detectWatermarks, presetBoxes, scoreBox } from './watermark-detect.js';
 import { unblendWatermark, residualIsNegligible } from './dewatermark.js';
 import { textureFill } from './texturefill.js';
 import { registerServiceWorker } from './updates.js';
@@ -1098,15 +1098,30 @@ function bindUI() {
   let candidates = [];
   let candidateIndex = 0;
 
+  /** Intersection-over-union of two boxes, for de-duplicating candidates. */
+  function iouBox(a, b) {
+    const x0 = Math.max(a.x, b.x), y0 = Math.max(a.y, b.y);
+    const x1 = Math.min(a.x + a.w, b.x + b.w), y1 = Math.min(a.y + a.h, b.y + b.h);
+    const inter = Math.max(0, x1 - x0) * Math.max(0, y1 - y0);
+    return inter <= 0 ? 0 : inter / (a.w * a.h + b.w * b.h - inter);
+  }
+
   function paintBox(box) {
     if (!maskCanvas) return;
     maskCanvas.clear();
     const ctx = maskCanvas.ctx;
     ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = 'rgba(255, 64, 192, 0.65)';
-    // Generous margin: badges are anti-aliased, and in watermark mode
-    // over-masking is free — un-blending returns alpha~0 pixels unchanged.
-    const pad = Math.max(3, Math.round(Math.max(box.w, box.h) * 0.22));
+    // Keep the margin small.
+    //
+    // Over-masking is NOT free, which is the opposite of what this comment used
+    // to claim. Recovery estimates the hidden background by interpolating across
+    // the mask, so a box that grows far enough to clip real scenery -- a
+    // horizon, a shadow edge -- poisons that estimate and tints the whole
+    // rectangle. Measured on a real Gemini file: a 6px margin left the result
+    // clean, a 12px margin reached the nearest line and left a visible mark.
+    // A few pixels for anti-aliasing, and no more.
+    const pad = Math.max(3, Math.round(Math.max(box.w, box.h) * 0.08));
     ctx.fillRect(box.x - pad, box.y - pad, box.w + pad * 2, box.h + pad * 2);
     D.stageHint.hidden = true;
   }
@@ -1150,12 +1165,38 @@ function bindUI() {
       const m = Math.max(p.w, p.h) * 0.6;
       return cx >= p.x - m && cx <= p.x + p.w + m && cy >= p.y - m && cy <= p.y + p.h + m;
     };
-    const scoredPresets = presets.map(p => {
-      const hit = detected.find(d => overlaps(d, p));
-      return { ...p, source: 'preset', score: hit ? hit.score : -1, corroborated: !!hit };
-    });
-    const confirmed = scoredPresets.filter(p => p.corroborated).sort((a, b) => b.score - a.score);
-    const unconfirmed = scoredPresets.filter(p => !p.corroborated);
+    // Use each preset as a place to LOOK, then mask what is actually found there.
+    //
+    // A preset box is only an approximation of where the badge sits, and it is
+    // nearly always the wrong shape -- square where the mark is not, or simply
+    // bigger. Masking the box itself is what caused the reported artefact: the
+    // box reached past the badge into a horizon, recovery interpolated its
+    // background across that edge, and the whole rectangle came back tinted.
+    //
+    // So each preset is searched for a compact badge-like blob, and it is the
+    // BLOB's own bounding box that becomes the candidate. Same search, far
+    // tighter mask, and it adapts to a badge whose size we do not have a
+    // profile for.
+    const scoredPresets = [];
+    for (const p of presets) {
+      const found = scoreBox(state.imageData, p);
+      if (!found) continue;
+      const hit = detected.find(d => overlaps(d, found));
+      scoredPresets.push({
+        x: found.x, y: found.y, w: found.w, h: found.h,
+        profile: p.profile, source: 'preset',
+        corroborated: !!hit,
+        rank: found.score + (hit ? 0.3 : 0),
+      });
+    }
+    // Two presets often find the same blob; keep the best-scoring version.
+    scoredPresets.sort((a, b) => b.rank - a.rank);
+    const confirmed = [];
+    for (const c of scoredPresets) {
+      if (confirmed.some(k => iouBox(k, c) > 0.5)) continue;
+      confirmed.push(c);
+    }
+    const unconfirmed = [];
     // Detections matching no known geometry still deserve a place — that is the
     // case where the badge is one we have no profile for.
     const orphans = detected

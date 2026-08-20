@@ -11,7 +11,7 @@
  * answer is "found nothing", and a detector that always fires is useless).
  */
 
-import { detectWatermarks } from '../static/js/watermark-detect.js';
+import { detectWatermarks, presetBoxes, scoreBox } from '../static/js/watermark-detect.js';
 
 let passed = 0;
 const failures = [];
@@ -228,6 +228,38 @@ test('a 4000x3000 image is analysed in under 2 seconds', () => {
   const ms = Date.now() - t0;
   assert(ms < 2000, `took ${ms}ms`);
   console.log(`      (${ms}ms)`);
+});
+
+console.log('\nLocating the mark inside a candidate box');
+
+test('scoreBox returns the marks own extent, not the box it was given', () => {
+  const img = makeImage(1024, 1024);
+  const truth = drawSparkle(img, 950, 950, 60);
+  // A deliberately over-large box around it, as a preset would give.
+  const found = scoreBox(img, { x: 890, y: 890, w: 130, h: 130 });
+  assert(found, 'found nothing');
+  assert(iou(found, truth) > 0.35,
+    `blob ${JSON.stringify(found)} does not match truth ${JSON.stringify(truth)}`);
+  assert(found.w < 110 && found.h < 110,
+    'returned something nearly as large as the box — it should be the mark, not the box');
+});
+
+test('prefers the whole mark over a neat fragment of it', () => {
+  const img = makeImage(1024, 1024);
+  drawSparkle(img, 950, 950, 60);
+  const whole = scoreBox(img, { x: 900, y: 900, w: 110, h: 110 });
+  const frag  = scoreBox(img, { x: 940, y: 940, w: 30, h: 30 });
+  assert(whole, 'whole-mark box found nothing');
+  if (frag) {
+    assert(whole.score >= frag.score,
+      `fragment scored ${frag.score.toFixed(2)} vs whole ${whole.score.toFixed(2)} — fragments must not win`);
+  }
+});
+
+test('reports nothing for a box containing only flat background', () => {
+  const img = makeImage(1024, 1024, 'flat');
+  assert(scoreBox(img, { x: 400, y: 400, w: 120, h: 120 }) === null,
+    'claimed to find a mark in flat background');
 });
 
 // === Summary ===============================================================

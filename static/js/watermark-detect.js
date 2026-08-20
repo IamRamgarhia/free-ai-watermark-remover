@@ -139,6 +139,11 @@ function buildRegions(W, H) {
  * plausible boxes and let the detector score them.
  */
 const BADGE_PROFILES = [
+  // Measured directly off a real Gemini file (768x1365): the sparkle occupies
+  // x 620-672, y 1218-1272, i.e. a ~54px mark sitting 96px in from both edges.
+  // Listed first because it is the only entry here taken from an actual image
+  // rather than from second-hand reports of what these badges look like.
+  { logo: 54, margin: 96 },
   { logo: 48, margin: 32 },
   { logo: 96, margin: 64 },
   { logo: 96, margin: 192 },
@@ -179,6 +184,153 @@ export function presetBoxes(W, H, corner = 'bottom-right') {
     w: prop, h: prop, profile: 'proportional',
   });
   return out;
+}
+
+
+/**
+ * Score a candidate box by how much it looks like it CONTAINS A BADGE.
+ *
+ * The obvious measure -- peak local contrast -- does not work, and it is worth
+ * saying why, because it looks reasonable and fails badly. Measured on a real
+ * Gemini file, boxes sitting on open terrain scored 102 and 58 while the boxes
+ * actually containing the sparkle scored 28. A faint badge is simply less
+ * contrasty than a horizon or a shadow, so "most contrast" reliably points at
+ * scenery.
+ *
+ * What separates a badge from scenery is not strength but SHAPE. A badge is a
+ * compact, roughly symmetric blob that sits clear of its surroundings; an edge
+ * running through the box is long, thin, and touches the sides. So the response
+ * is thresholded, broken into regions, and each is judged on how blob-like it
+ * is -- squareness, how solidly it fills its own bounding box, whether it takes
+ * up a plausible share of the candidate, and whether it stays clear of the
+ * edges. The best region's score is the box's score.
+ *
+ * Returns the winning region's own bounding box as well as its score. That
+ * location is the point of the exercise: a preset box is only ever an
+ * approximation of where the badge sits, and it is nearly always the wrong
+ * SHAPE -- too large, or square where the mark is not. Recovery is very
+ * sensitive to a mask that includes scenery, so what we actually want is the
+ * mark's own extent, which this already has to compute in order to score.
+ *
+ * @returns {{score:number, x:number, y:number, w:number, h:number}|null}
+ */
+export function scoreBox(imageData, box) {
+  const { width: W, height: H, data } = imageData;
+  const x0 = Math.max(0, box.x), y0 = Math.max(0, box.y);
+  const x1 = Math.min(W, box.x + box.w), y1 = Math.min(H, box.y + box.h);
+  const bw = x1 - x0, bh = y1 - y0;
+  if (bw < 8 || bh < 8) return null;
+
+  const n = bw * bh;
+  const lum = new Float32Array(n);
+  for (let y = 0; y < bh; y++) {
+    for (let x = 0; x < bw; x++) {
+      const i = ((y0 + y) * W + (x0 + x)) * 4;
+      lum[y * bw + x] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    }
+  }
+
+  const short = Math.min(bw, bh);
+  const near = boxBlur(lum, bw, bh, Math.max(1, Math.round(short * 0.05)));
+  const far  = boxBlur(lum, bw, bh, Math.max(4, Math.round(short * 0.5)));
+  const resid = new Float32Array(n);
+  let peak = 0;
+  for (let i = 0; i < n; i++) {
+    resid[i] = near[i] - far[i];
+    const a = Math.abs(resid[i]);
+    if (a > peak) peak = a;
+  }
+  if (peak < 2.5) return null;
+
+  // Try both polarities; a badge may be lighter or darker than its background.
+  let best = 0, bestComp = null, bestSign = 1;
+  for (const sign of [1, -1]) {
+    const bin = new Uint8Array(n);
+    const thr = peak * 0.45;
+    for (let i = 0; i < n; i++) bin[i] = sign * resid[i] >= thr ? 1 : 0;
+
+    for (const c of components(bin, bw, bh)) {
+      const cw = c.maxX - c.minX + 1, ch = c.maxY - c.minY + 1;
+      if (c.count < 12) continue;
+      const fill = c.count / (cw * ch);
+      const aspect = Math.min(cw, ch) / Math.max(cw, ch);
+      const share = (cw * ch) / n;
+      // A badge occupies a healthy but not overwhelming share of a well-aimed box.
+      const shareScore = share > 0.02 && share < 0.75 ? 1 : 0.15;
+      // Touching the box edge suggests something passing through rather than
+      // sitting inside -- an edge, not a badge.
+      const touches = (c.minX === 0 || c.minY === 0 || c.maxX === bw - 1 || c.maxY === bh - 1);
+      const isolation = touches ? 0.25 : 1;
+      const score = aspect * fill * shareScore * isolation * 3;
+      if (score > best) { best = score; bestComp = c; bestSign = sign; }
+    }
+  }
+  if (!bestComp) return null;
+
+  // Grow the core out to the mark's true extent.
+  //
+  // Thresholding at a level high enough to reject scenery only captures the
+  // BRIGHT CORE of a soft-edged badge -- on the file this was tuned against it
+  // returned 36x36 for a sparkle that is really 52x54, leaving the arms behind
+  // to reappear as a faint cross after removal. Growing outward from the core
+  // at a much lower threshold picks those arms up, and because growth is local
+  // and bounded it cannot wander off into a horizon the way a globally lower
+  // threshold would.
+  // Re-derive the winning component's pixels: components() keeps only bounds,
+  // and re-thresholding inside those bounds is cheaper than retaining lists for
+  // every candidate region just to use one of them.
+  const grow = new Uint8Array(n);
+  const stack = [];
+  const seedThr = peak * 0.45;
+  for (let y = bestComp.minY; y <= bestComp.maxY; y++) {
+    for (let x = bestComp.minX; x <= bestComp.maxX; x++) {
+      const i = y * bw + x;
+      if (bestSign * resid[i] >= seedThr) { grow[i] = 1; stack.push(i); }
+    }
+  }
+  if (!stack.length) return null;
+  const soft = peak * 0.12;
+  const maxReach = Math.round(Math.max(bestComp.maxX - bestComp.minX, bestComp.maxY - bestComp.minY) * 0.9) + 6;
+  const cx = (bestComp.minX + bestComp.maxX) / 2, cy = (bestComp.minY + bestComp.maxY) / 2;
+  while (stack.length) {
+    const o = stack.pop();
+    const ox = o % bw, oy = (o / bw) | 0;
+    const nb = [];
+    if (ox > 0) nb.push(o - 1);
+    if (ox < bw - 1) nb.push(o + 1);
+    if (oy > 0) nb.push(o - bw);
+    if (oy < bh - 1) nb.push(o + bw);
+    for (const k of nb) {
+      if (grow[k]) continue;
+      const kx = k % bw, ky = (k / bw) | 0;
+      if (Math.abs(kx - cx) > maxReach || Math.abs(ky - cy) > maxReach) continue;
+      if (bestSign * resid[k] < soft) continue;
+      grow[k] = 1;
+      stack.push(k);
+    }
+  }
+
+  let mnX = bw, mnY = bh, mxX = -1, mxY = -1;
+  for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
+    if (!grow[y * bw + x]) continue;
+    if (x < mnX) mnX = x; if (x > mxX) mxX = x;
+    if (y < mnY) mnY = y; if (y > mxY) mxY = y;
+  }
+  // Penalise fragments.
+  //
+  // Compactness alone rewards seeing only PART of a mark: a small preset box
+  // centred on one arm of a sparkle finds a neat little blob that scores better
+  // than the whole badge does. Masking that fragment leaves the rest of the
+  // watermark on screen. Scale the score by how much of a plausible badge the
+  // blob actually spans, so the complete mark wins over a tidy piece of it.
+  const dim = Math.max(mxX - mnX + 1, mxY - mnY + 1);
+  const completeness = Math.min(1, dim / 45);
+
+  return {
+    score: best * completeness,
+    x: x0 + mnX, y: y0 + mnY,
+    w: mxX - mnX + 1, h: mxY - mnY + 1,
+  };
 }
 
 function scanRegion(imageData, region, W, H) {
