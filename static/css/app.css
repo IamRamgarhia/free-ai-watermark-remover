@@ -1427,7 +1427,16 @@ body.app-page {
 @media (max-width: 900px) {
   .app-grid {
     grid-template-columns: 1fr;
+    /* The desktop rule pins the grid to a fixed height and splits it
+       side-by-side. Stacked on a phone, the sidebar sits ABOVE the canvas and
+       eats nearly all of that fixed height — measured on a 478px viewport, the
+       stage collapsed to 34px while still containing a 487px canvas, so the
+       image overflowed and was clipped to a sliver. Size to content instead and
+       give the stage a real minimum of its own. */
+    height: auto;
   }
+  .canvas-area { padding: 12px; }
+  .stage { min-height: 56vh; }
   .sidebar {
     border-right: none;
     border-bottom: 1px solid var(--border);
@@ -1436,6 +1445,10 @@ body.app-page {
     padding: 12px;
   }
   .sidebar .card { min-width: 240px; flex-shrink: 0; }
+  /* The toolbar has more controls than fit a phone; let it scroll sideways
+     rather than wrap into a tall stack that pushes the canvas off screen. */
+  .toolbar { overflow-x: auto; flex-wrap: nowrap; }
+  .detect-status { max-width: 150px; }
   .topbar { padding: 0 12px; }
   .nav-btn { padding: 6px 10px; font-size: 12px; }
   .brand-name { font-size: 15px; }

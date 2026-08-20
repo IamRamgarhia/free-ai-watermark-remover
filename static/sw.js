@@ -11,7 +11,7 @@
  * The AI model is NOT cached here — it lives in IndexedDB (see model-cache.js).
  */
 
-const CACHE_VERSION = 'watermarkout-v1.3.1';
+const CACHE_VERSION = 'watermarkout-v1.3.2';
 
 // Everything needed to render both pages with no network. If you add an asset
 // that either HTML file references, add it here too — otherwise it 404s for

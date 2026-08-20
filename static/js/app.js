@@ -1081,7 +1081,9 @@ function bindUI() {
     if (!c) return;
     paintBox(c);
     D.btnDetectNext.hidden = candidates.length < 2;
-    const label = c.source === 'preset' ? `preset ${c.profile}` : 'detected';
+    const label = c.source === 'preset'
+      ? (c.corroborated ? `found ${c.profile}` : `preset ${c.profile}`)
+      : 'detected';
     if (D.detectStatus) {
       D.detectStatus.textContent =
         `${label} — ${i + 1} of ${candidates.length}. Not right? Try next, or drag your own box.`;
@@ -1096,16 +1098,38 @@ function bindUI() {
     const corner = D.detectRegion?.value || 'bottom-right';
     const { width: W, height: H } = state.imageData;
 
-    const detected = detectWatermarks(state.imageData, { region: corner, maxResults: 3 })
-      .map(c => ({ ...c, source: 'detected' }));
-    const presets = presetBoxes(W, H, corner)
-      .map(b => ({ ...b, source: 'preset' }));
+    const detected = detectWatermarks(state.imageData, { region: corner, maxResults: 3 });
+    const presets = presetBoxes(W, H, corner);
 
-    // Detections first when there are any — they are grounded in this actual
-    // image. Presets follow as reliable fallbacks in known-geometry order.
-    candidates = [...detected, ...presets];
+    // Combine rather than rank one source above the other.
+    //
+    // Detection is good at answering "is there a watermark, and roughly where",
+    // but it traces the badge's bright core and misses the faint anti-aliased
+    // arms — measured at 70% coverage on a sparkle where the matching preset
+    // covered 100%. The preset is good at extent but cannot tell which of the
+    // known geometries applies. So let detection CHOOSE the preset: a preset
+    // that a detection lands inside gets promoted, and keeps its own generous
+    // box. Best of both, instead of the worse of the two winning on source.
+    const overlaps = (d, p) => {
+      const cx = d.x + d.w / 2, cy = d.y + d.h / 2;
+      const m = Math.max(p.w, p.h) * 0.6;
+      return cx >= p.x - m && cx <= p.x + p.w + m && cy >= p.y - m && cy <= p.y + p.h + m;
+    };
+    const scoredPresets = presets.map(p => {
+      const hit = detected.find(d => overlaps(d, p));
+      return { ...p, source: 'preset', score: hit ? hit.score : -1, corroborated: !!hit };
+    });
+    const confirmed = scoredPresets.filter(p => p.corroborated).sort((a, b) => b.score - a.score);
+    const unconfirmed = scoredPresets.filter(p => !p.corroborated);
+    // Detections matching no known geometry still deserve a place — that is the
+    // case where the badge is one we have no profile for.
+    const orphans = detected
+      .filter(d => !presets.some(p => overlaps(d, p)))
+      .map(d => ({ ...d, source: 'detected' }));
+
+    candidates = [...confirmed, ...orphans, ...unconfirmed];
     candidateIndex = 0;
-    dbg.log(`Find: ${detected.length} detected + ${presets.length} preset candidates (${corner})`);
+    dbg.log(`Find: ${detected.length} detected, ${confirmed.length} confirmed preset(s), ${candidates.length} candidates (${corner})`);
 
     if (!candidates.length) {
       showStageModal({
