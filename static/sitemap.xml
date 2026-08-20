@@ -1,12 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Keep <lastmod> accurate — Google discounts the signal if it goes stale.
+  tools/check.mjs warns when this drifts far from the newest committed change.
+
+  NOTE: this is a GitHub Pages *project* site, so robots.txt lives at
+  /free-ai-watermark-remover/robots.txt, not at the origin root. Search engines
+  only read robots.txt from the origin root, so the Sitemap: line there is never
+  auto-discovered — submit this file manually in Google Search Console and Bing
+  Webmaster Tools.
+-->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://iamramgarhia.github.io/free-ai-watermark-remover/</loc>
+    <lastmod>2026-08-20</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://iamramgarhia.github.io/free-ai-watermark-remover/about.html</loc>
+    <lastmod>2026-08-20</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>

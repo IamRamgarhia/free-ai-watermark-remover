@@ -11,7 +11,7 @@
  * The AI model is NOT cached here — it lives in IndexedDB (see model-cache.js).
  */
 
-const CACHE_VERSION = 'watermarkout-v1.1.0';
+const CACHE_VERSION = 'watermarkout-v1.2.0';
 
 // Everything needed to render both pages with no network. If you add an asset
 // that either HTML file references, add it here too — otherwise it 404s for
@@ -24,6 +24,7 @@ const APP_SHELL = [
   './manifest.webmanifest',
   './css/app.css',
   './css/about.css',
+  './css/fonts.css',
   './js/app.js',
   './js/about.js',
   './js/upload.js',
@@ -37,6 +38,9 @@ const APP_SHELL = [
   './js/video.js',
   './js/coi-bootstrap.js',
   './js/fs-folder.js',
+  './assets/fonts/syne-variable.woff2',
+  './assets/fonts/dm-mono-400.woff2',
+  './assets/fonts/dm-mono-500.woff2',
   './assets/logo.svg',
   './assets/logo-icon.svg',
   './assets/hero-illustration.svg',

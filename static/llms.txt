@@ -1,0 +1,52 @@
+# WatermarkOut
+
+> A free, open-source watermark remover for AI-generated images and short videos.
+> The AI model runs entirely inside the user's browser via WebAssembly, so files
+> are never uploaded to any server. There is no backend, no account system and no
+> telemetry.
+
+WatermarkOut removes watermarks and small unwanted objects by inpainting: the user
+masks a region and a GAN fills it in from the surrounding pixels. Pixels outside the
+mask are copied through unchanged.
+
+## Key facts
+
+- **Cost:** free, with no paid tier. There is no server to pay for, so there is nothing to meter.
+- **Privacy:** images and videos never leave the browser tab. The only network requests are the app's own static files and a one-time 29 MB model download from Hugging Face on first visit. The model is checksum-verified and cached locally.
+- **Model:** MI-GAN (Picsart Research, ICCV 2023), run through ONNX Runtime Web with a WebGPU → WASM fallback chain.
+- **Output:** no watermark is added to results. Save as PNG, JPG or WebP.
+- **Offline:** works fully offline after the first visit; installable as a PWA.
+- **Licence:** MIT. Source at https://github.com/IamRamgarhia/free-ai-watermark-remover
+- **Author:** Prince Ramgarhia (DiceCodes), Batala, Punjab, India.
+
+## Supported watermarks
+
+One-click presets exist for Google Gemini, OpenAI DALL·E (including the DALL·E 2
+colour bar), Midjourney, Adobe Firefly, Bing Image Creator, Meta AI, and tiled
+stock-photo patterns. Anything else can be masked by hand with a rectangle or brush.
+
+## Supported formats
+
+- Images: JPG, PNG, WebP, BMP — up to about 100 MB
+- Video: MP4, WebM, MOV — short clips, audio preserved
+- Browsers: Chrome/Edge 90+, Firefox 90+, Safari 16.4+
+
+## Known limitations
+
+- Busy backgrounds (faces, fine text, brickwork) reconstruct poorly — this is a
+  limitation of inpainting models generally, not a defect.
+- Video uses a single static patch applied across frames, so it suits fixed corner
+  watermarks; a watermark that moves is not handled.
+- Long videos are slow because every frame is decoded and re-encoded in the browser.
+- The model reconstructs plausible pixels; it does not recover what was underneath.
+
+## Intended use
+
+For images the user created or otherwise has the right to edit. Not intended for
+stripping watermarks from other people's copyrighted work, circumventing stock
+licensing, or passing AI-generated images off as photographs.
+
+## Pages
+
+- [Editor](https://iamramgarhia.github.io/free-ai-watermark-remover/): the app, plus how-to steps, supported formats, limitations and FAQ.
+- [About](https://iamramgarhia.github.io/free-ai-watermark-remover/about.html): who built it, why, and how it works technically.

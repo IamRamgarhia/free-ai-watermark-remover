@@ -30,6 +30,7 @@ const state = {
   outputFormat: 'png',
   showResult: false,
   removeClickCount: 0,
+  modelReady: false,   // the editor renders before the model finishes loading
 };
 
 // === DOM ===
@@ -173,17 +174,16 @@ async function bootstrap() {
     }
   }, 500);
 
-  // Show the loader while the model loads AND ORT initializes the inference
-  // session. We only reveal the editor when the engine is fully usable — that
-  // way the "AI model still loading" modal never appears mid-edit.
-
-  const showAppNow = () => {
+  // The editor is visible from first paint — it is NOT gated on the model.
+  // Previously the whole app sat behind `hidden` until a 29 MB download and
+  // WASM init finished, which meant a first-time visitor stared at a spinner
+  // and a search-engine crawler saw nothing but "Looking for the AI model…".
+  // Now you can drop a file and draw a mask while the model streams in; only
+  // the Remove button waits.
+  const hideLoaderStrip = () => {
     D.loader.style.opacity = '0';
     D.loader.style.transition = 'opacity 0.3s';
-    setTimeout(() => {
-      D.loader.hidden = true;
-      D.appGrid.hidden = false;
-    }, 300);
+    setTimeout(() => { D.loader.hidden = true; }, 300);
   };
 
   try {
@@ -201,8 +201,9 @@ async function bootstrap() {
     refreshStorageStatus();
     setStatus(`Ready (${backend})`, 'ready');
     toast('AI engine ready.', 'success', 2500);
-    // Only show the app once the inpainter is fully ready
-    showAppNow();
+    state.modelReady = true;
+    updateRemoveEnabled();
+    hideLoaderStrip();
   } catch (e) {
     console.error('Bootstrap failed:', e);
     dbg.error('Bootstrap: ' + (e.message || e));
@@ -211,8 +212,24 @@ async function bootstrap() {
     setModelStatus('error');
     document.getElementById('loader-title').textContent = 'Could not load the AI model';
     document.getElementById('loader-sub').textContent = String(e.message || e);
-    D.loaderMeta.textContent = 'Check static/js/model-cache.js URL or your internet, then refresh.';
+    D.loaderMeta.textContent = 'Check your internet connection, then refresh.';
   }
+}
+
+/**
+ * Remove needs BOTH a loaded file and a ready model. The editor is now usable
+ * before the model arrives, so this is the single place that decides whether
+ * the button is live, rather than each load path guessing.
+ */
+function updateRemoveEnabled() {
+  if (!D.btnRemove) return;
+  const hasFile = !!state.imageData;
+  D.btnRemove.disabled = !(hasFile && state.modelReady);
+  D.btnRemove.title = !hasFile
+    ? 'Drop an image or video first'
+    : !state.modelReady
+      ? 'Waiting for the AI model to finish loading…'
+      : 'Remove the watermark inside your mask';
 }
 
 function setModelStatus(state) {
@@ -320,7 +337,7 @@ async function onFileLoaded({ file, image, kind, error }) {
   D.fileName.textContent = file.name;
   D.fileSize.textContent = formatBytes(file.size);
   D.btnDownload.disabled = true;
-  D.btnRemove.disabled = false;
+  updateRemoveEnabled();   // may still be waiting on the model
   D.btnNewFile.disabled = false;
   D.btnStartOver.disabled = false;
 
@@ -517,7 +534,7 @@ function resetToDropzone() {
   D.fileName.textContent = 'No file loaded';
   D.fileDims.textContent = '— × —';
   D.fileSize.textContent = '— MB';
-  D.btnRemove.disabled = true;
+  updateRemoveEnabled();   // no file now, so this disables it
   D.btnDownload.disabled = true;
   D.btnNewFile.disabled = true;
   D.btnStartOver.disabled = true;

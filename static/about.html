@@ -4,16 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
-  <!-- Content Security Policy. Stricter than index.html: the About page loads
-       no third-party code at all, only Google Fonts. See index.html for notes. -->
+  <!-- Content Security Policy. Stricter than index.html: this page loads no
+       third-party code or assets at all — fonts are self-hosted. -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
     base-uri 'self';
     object-src 'none';
     form-action 'none';
     script-src 'self';
-    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-    font-src 'self' https://fonts.gstatic.com;
+    style-src 'self' 'unsafe-inline';
+    font-src 'self';
     img-src 'self' data:;
     manifest-src 'self';
     connect-src 'self';
@@ -68,10 +68,8 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="assets/logo-icon.svg">
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
-
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap">
+  <!-- Self-hosted fonts — no third-party request. See css/fonts.css. -->
+  <link rel="stylesheet" href="css/fonts.css">
 
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/about.css">
@@ -94,13 +92,14 @@
     <!-- HERO -->
     <section class="about-hero">
       <img src="assets/logo.svg" alt="WatermarkOut" class="about-logo">
-      <h1 class="about-title">WatermarkOut</h1>
+      <h1 class="about-title">About WatermarkOut</h1>
       <p class="about-tagline">
-        Remove watermarks from images — free, private, and instantly.
+        A free, private watermark remover for AI-generated images and short
+        videos — the AI runs in your browser, so nothing is ever uploaded.
         Nothing to install. Nothing to sign up for.
       </p>
       <div class="badge-row">
-        <span class="badge" id="version-badge">v1.1.0</span>
+        <span class="badge" id="version-badge">v1.2.0</span>
         <span class="badge">MIT License</span>
         <span class="badge success">No telemetry</span>
         <span class="badge success">No accounts</span>
@@ -112,14 +111,16 @@
     <section class="about-card">
       <h2>🎯 Why this exists</h2>
       <blockquote>
-        Watermark removers online charge ₹800–₹2,500 / month ($10–$30),
-        upload your private images to unknown servers, and slap their own watermark
-        on the free tier. That's broken.
+        Watermark removers typically run on someone else's servers: you upload a
+        private photo, pay a monthly subscription, and often get a result with
+        <em>their</em> watermark on it unless you upgrade. That's broken.
       </blockquote>
       <p>
         WatermarkOut runs <strong>entirely in your browser</strong>. Your file
-        never leaves the tab. No subscriptions, no accounts, no cloud — verifiable
-        because the source is MIT-licensed and the network tab is empty after first load.
+        never leaves the tab. No subscriptions, no accounts, no cloud — and because
+        the source is MIT-licensed, you can check that claim rather than trust it.
+        Apart from the app's own files and a one-time 29&nbsp;MB model download on
+        your first visit, nothing goes over the network.
       </p>
     </section>
 
@@ -184,7 +185,7 @@
         </li>
       </ol>
       <p class="text-muted">
-        Open your browser's Network tab to verify: after the first load, no requests are made.
+        Open your browser's Network tab and check for yourself: once the app and the model are cached, removing a watermark makes no network requests at all.
       </p>
     </section>
 
@@ -195,13 +196,13 @@
         <a href="https://github.com/IamRamgarhia/Free-GST-Billing-Software"
            class="project-card" target="_blank" rel="noopener">
           <h3>Free GST Billing</h3>
-          <p>The only GST invoicing software you'll never have to pay for.</p>
+          <p>Free GST invoicing — no subscription, no per-invoice fees.</p>
           <span class="project-cta">View on GitHub →</span>
         </a>
         <a href="https://github.com/IamRamgarhia/SEO-Tool"
            class="project-card" target="_blank" rel="noopener">
           <h3>SEO Tool</h3>
-          <p>Self-hosted alternative to $300+/mo SEO platforms. 150+ tools.</p>
+          <p>A self-hosted SEO toolkit you run yourself. 150+ tools.</p>
           <span class="project-cta">View on GitHub →</span>
         </a>
         <a href="https://github.com/IamRamgarhia/AdForge"
