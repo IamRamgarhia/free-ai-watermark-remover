@@ -89,8 +89,14 @@ export function textureFill(imageData, maskData, opts = {}) {
   const allErrors = [];
   const evaluate = (dx, dy) => {
     if (dx === 0 && dy === 0) return;
-    // The source region must lie inside the image and must not itself be hole.
+    // The source region must lie inside the image.
     if (hx + dx < 0 || hy + dy < 0 || hx + dx + hw > W || hy + dy + hh > H) return;
+    // …and must not overlap the hole itself. Without this, a tiny offset scores
+    // superbly on smooth content — the ring either side of a 1px shift matches
+    // almost exactly — while the pixels it copies FROM are the watermark. The
+    // repair would then paste the mark back one pixel over and report perfect
+    // confidence. Require the source to clear the hole entirely.
+    if (Math.abs(dx) < hw && Math.abs(dy) < hh) return;
     let sse = 0, n = 0;
     for (let k = 0; k < probes.length; k++) {
       const o = probes[k];
