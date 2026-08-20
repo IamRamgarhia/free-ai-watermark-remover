@@ -35,6 +35,7 @@ const rows = {
   coverage: $('dbg-coverage'),
   tool:     $('dbg-tool'),
   quality:  $('dbg-quality'),
+  mode:     $('dbg-mode'),
   removes:  $('dbg-removes'),
   action:   $('dbg-action'),
   error:    $('dbg-error'),

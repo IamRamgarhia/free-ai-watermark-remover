@@ -7,6 +7,8 @@ import { APP_VERSION } from './version.js';
 import { bindDropzone, imageToImageData } from './upload.js';
 import { MaskCanvas, dilateMask, maskHasContent } from './mask.js';
 import * as inpainter from './inpainter.js';
+import { detectWatermarks } from './watermark-detect.js';
+import { unblendWatermark, residualIsNegligible } from './dewatermark.js';
 import { registerServiceWorker } from './updates.js';
 import { toast } from './toast.js';
 import { isModelCached, clearModel } from './model-cache.js';
@@ -25,7 +27,8 @@ const state = {
   filename: null,
   tool: 'rect',
   brushSize: 30,
-  quality: 'balanced',
+  quality: 'standard',
+  mode: 'watermark',   // 'watermark' = un-blend then fill; 'object' = fill only
   maskExpand: 8,
   outputFormat: 'png',
   showResult: false,
@@ -75,8 +78,9 @@ const D = {
   btnClearMask: document.getElementById('btn-clear-mask'),
   btnZoomFit: document.getElementById('btn-zoom-fit'),
   btnClearModel: document.getElementById('btn-clear-model'),
-  btnApplyPreset: document.getElementById('btn-apply-preset'),
-  presetSelect: document.getElementById('preset-select'),
+  btnDetect: document.getElementById('btn-detect'),
+  btnDetectNext: document.getElementById('btn-detect-next'),
+  detectRegion: document.getElementById('detect-region'),
   btnPickFolder: document.getElementById('btn-pick-folder'),
 
   modelStatus: document.getElementById('model-status'),
@@ -701,15 +705,56 @@ async function runRemoval() {
   }
 }
 
+/**
+ * Two-stage removal.
+ *
+ * Stage 1 (watermark mode only) un-blends the mark: most generator badges are
+ * semi-transparent, which means the original content is still present in those
+ * pixels and can be solved for rather than invented. This is what keeps texture
+ * — wood grain, skin, brick — intact instead of replacing it with a smear of
+ * neighbouring colour.
+ *
+ * Stage 2 inpaints only what stage 1 could not recover: the fully opaque core,
+ * where no information about the original survives. For a typical translucent
+ * badge that residual is a few percent of the mask, and often nothing at all.
+ *
+ * In 'object' mode stage 1 is skipped entirely. Un-blending assumes the mask
+ * covers a translucent overlay; pointed at a solid object it would "recover"
+ * meaningless values, so removing a person or a sign goes straight to the
+ * generative fill.
+ */
 async function runImageRemoval(maskData) {
   const t0 = performance.now();
-  // featherRadius is intentionally not passed — it comes from the quality preset.
-  const result = await inpainter.inpaint(state.imageData, maskData, {
-    quality: state.quality,
-    onPass: (i, total) => {
-      if (total > 1) D.processingStage.textContent = `Refining — AI pass ${i + 1} of ${total}`;
-    },
-  });
+  let source = state.imageData;
+  let fillMask = maskData;
+  let recovery = null;
+
+  if (state.mode === 'watermark') {
+    D.processingStage.textContent = 'Separating the watermark from the image…';
+    // Yield so the overlay actually paints before this blocks the thread.
+    await new Promise(r => setTimeout(r, 0));
+    recovery = unblendWatermark(state.imageData, maskData);
+    source = recovery.result;
+    fillMask = recovery.residualMask;
+    dbg.log(
+      `Un-blend: recovered ${recovery.stats.recovered} px, ` +
+      `${recovery.stats.opaque} px too opaque ` +
+      `(${(recovery.stats.residualFraction * 100).toFixed(1)}% needs fill)`
+    );
+  }
+
+  const needsFill = state.mode !== 'watermark' || !residualIsNegligible(recovery.stats);
+  let result = source;
+
+  if (needsFill) {
+    D.processingStage.textContent = 'Filling what could not be recovered…';
+    result = await inpainter.inpaint(source, fillMask, {
+      quality: state.quality,
+      onPass: (i, total) => {
+        if (total > 1) D.processingStage.textContent = `Refining — AI pass ${i + 1} of ${total}`;
+      },
+    });
+  }
   const tMs = Math.round(performance.now() - t0);
 
   state.resultData = result;
@@ -726,8 +771,13 @@ async function runImageRemoval(maskData) {
   state.showResult = true;
   setPreviewLabel('after');
 
-  dbg.log(`Image inpaint done in ${(tMs / 1000).toFixed(1)}s`);
-  toast(`Watermark removed in ${(tMs / 1000).toFixed(1)}s. Click Download.`, 'success');
+  dbg.log(`Removal done in ${(tMs / 1000).toFixed(1)}s`);
+  const how = recovery && !needsFill
+    ? 'recovered from under the watermark — no pixels invented'
+    : recovery
+      ? `${(100 - recovery.stats.residualFraction * 100).toFixed(0)}% recovered, the rest filled in`
+      : 'filled in';
+  toast(`Done in ${(tMs / 1000).toFixed(1)}s — ${how}. Click Download.`, 'success', 5000);
 }
 
 async function runVideoRemoval(maskData) {
@@ -951,9 +1001,8 @@ function bindUI() {
   });
 
   const QUALITY_HINTS = {
-    fast:     'Fast — one AI pass, tight crop. Sharpest detail, least context.',
-    balanced: 'Balanced — one AI pass, wide context.',
-    best:     'Best — two AI passes (structure, then sharpen). ~2× slower.',
+    standard: 'One AI pass. Only used where recovery was not possible.',
+    high:     'Two AI passes over the un-recoverable part. Roughly twice as slow.',
   };
   const qualityHint = document.getElementById('quality-hint');
   document.querySelectorAll('input[name="quality"]').forEach(r => {
@@ -961,6 +1010,19 @@ function bindUI() {
       state.quality = r.value;
       if (qualityHint) qualityHint.textContent = QUALITY_HINTS[r.value] || '';
       dbg.set('quality', r.value);
+    });
+  });
+
+  const MODE_HINTS = {
+    watermark: 'Recovers the detail hidden under a see-through watermark instead of painting over it.',
+    object:    'Paints over the masked area with AI-generated fill. Use for solid objects and opaque logos.',
+  };
+  const modeHint = document.getElementById('mode-hint');
+  document.querySelectorAll('input[name="mode"]').forEach(r => {
+    r.addEventListener('change', () => {
+      state.mode = r.value;
+      if (modeHint) modeHint.textContent = MODE_HINTS[r.value] || '';
+      dbg.set('mode', r.value);
     });
   });
 
@@ -982,106 +1044,72 @@ function bindUI() {
 
   D.stageModalOk?.addEventListener('click', hideStageModal);
 
-  // === Preset watermark masks ===
+  // === Automatic watermark detection ===
   //
-  // Coordinates as fractions of the image dimensions: (x, y) = top-left corner
-  // of the mask rect, (w, h) = mask size. Tuned to match real watermark sizes
-  // on a 1024×1024 reference image. Tight masks = cleaner MI-GAN output.
-  //
-  // Each preset also has a `shape` — 'rounded' draws a rounded-rect (matches
-  // most AI logo badges); 'rect' is a plain rectangle.
-  const PRESETS = {
-    // Gemini's sparkle badge is ~70px on a 1024-wide image (~7%).
-    // Margin from edge is ~25px (~2.5%).
-    'gemini-br':       { x: 0.89, y: 0.89, w: 0.085, h: 0.075, shape: 'rounded', label: 'Gemini ✨ bottom-right' },
-    'gemini-bl':       { x: 0.025, y: 0.89, w: 0.085, h: 0.075, shape: 'rounded', label: 'Gemini ✨ bottom-left' },
+  // This replaces a table of hardcoded coordinates ("Gemini sits at 89% across,
+  // 89% down"). Those were guesses that could not survive a different aspect
+  // ratio or a restyled badge, and in practice they drew the mask beside the
+  // watermark rather than on it. See js/watermark-detect.js for how the search
+  // works. Results are PROPOSED, never silently applied — the detector can be
+  // fooled by a genuinely badge-like object, so the user sees the box and can
+  // step to the next candidate or redraw it by hand.
+  let detectCandidates = [];
+  let detectIndex = 0;
 
-    // DALL·E watermark is small text "DALL·E" at the bottom-right.
-    'dalle-br':        { x: 0.88, y: 0.945, w: 0.10, h: 0.03, shape: 'rounded', label: 'DALL·E bottom-right' },
-
-    // DALL·E 2 has a tiny multi-color bar in the very corner.
-    'dalle-color-bar': { x: 0.93, y: 0.955, w: 0.06, h: 0.025, shape: 'rect', label: 'DALL·E 2 color bar' },
-
-    // Bing Image Creator: small Bing logo + watermark.
-    'bing-creator':    { x: 0.88, y: 0.91, w: 0.10, h: 0.06, shape: 'rounded', label: 'Bing Image Creator' },
-
-    // Adobe Firefly: rounded badge with star icon.
-    'firefly-br':      { x: 0.89, y: 0.89, w: 0.085, h: 0.075, shape: 'rounded', label: 'Adobe Firefly' },
-
-    // Midjourney doesn't strictly watermark but credit-strips appear at bottom.
-    'midjourney-br':   { x: 0.86, y: 0.94, w: 0.12, h: 0.035, shape: 'rounded', label: 'Midjourney credit' },
-
-    // Meta AI: rounded "Imagined with AI" badge.
-    'meta-ai':         { x: 0.025, y: 0.90, w: 0.18, h: 0.05, shape: 'rounded', label: 'Meta AI' },
-
-    // Tiled stock-photo watermarks are not corner-located — handled separately.
-    'stock-tile':      null,
-  };
-
-  function fillRoundedRect(ctx, x, y, w, h, r) {
-    const radius = Math.min(r, w / 2, h / 2);
-    ctx.beginPath();
-    ctx.moveTo(x + radius, y);
-    ctx.arcTo(x + w, y, x + w, y + h, radius);
-    ctx.arcTo(x + w, y + h, x, y + h, radius);
-    ctx.arcTo(x, y + h, x, y, radius);
-    ctx.arcTo(x, y, x + w, y, radius);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  function applyPreset(key) {
-    if (!state.imageData || !maskCanvas) {
-      showStageModal({ icon: '🖼', title: 'Load a file first', msg: 'Drop an image or video, then pick a watermark preset.' });
-      return;
-    }
-    if (key === 'custom') return;
-
-    const { width: w, height: h } = state.imageData;
+  function paintDetected(box) {
+    if (!maskCanvas) return;
     maskCanvas.clear();
     const ctx = maskCanvas.ctx;
     ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = 'rgba(255, 64, 192, 0.65)';
-
-    if (key === 'stock-tile') {
-      const cell = Math.round(Math.min(w, h) * 0.22);
-      ctx.save();
-      for (let y = 0; y < h; y += cell) {
-        for (let x = 0; x < w; x += cell) {
-          if (((x / cell) + (y / cell)) % 2 === 0) {
-            ctx.fillRect(x + cell * 0.3, y + cell * 0.4, cell * 0.5, cell * 0.2);
-          }
-        }
-      }
-      ctx.restore();
-      dbg.log(`Preset stock-tile applied across ${w}×${h}`);
-      toast('Applied tiled stock-photo mask. Fine-tune with brush if needed.', 'info', 4500);
-    } else {
-      const p = PRESETS[key];
-      if (!p) return;
-      const rx = Math.round(w * p.x);
-      const ry = Math.round(h * p.y);
-      const rw = Math.round(w * p.w);
-      const rh = Math.round(h * p.h);
-      if (p.shape === 'rounded') {
-        const radius = Math.round(Math.min(rw, rh) * 0.35);
-        fillRoundedRect(ctx, rx, ry, rw, rh, radius);
-      } else {
-        ctx.fillRect(rx, ry, rw, rh);
-      }
-      dbg.log(`Preset ${key}: rect(${rx}, ${ry}, ${rw}, ${rh}) over image ${w}×${h}`);
-      toast(`Applied "${p.label}" preset. Fine-tune with brush if needed, then Remove.`, 'info', 4500);
-    }
-
+    // Generous margin. Badges are anti-aliased, so their faintest pixels sit
+    // outside the detected box — and in watermark mode over-masking is free:
+    // un-blending solves alpha per pixel, and where alpha is ~0 it returns the
+    // pixel unchanged. Covering a little extra costs nothing and catching the
+    // faint outer tips matters.
+    const pad = Math.max(3, Math.round(Math.max(box.w, box.h) * 0.22));
+    ctx.fillRect(box.x - pad, box.y - pad, box.w + pad * 2, box.h + pad * 2);
     D.stageHint.hidden = true;
   }
 
-  D.btnApplyPreset?.addEventListener('click', () => {
-    applyPreset(D.presetSelect?.value || 'custom');
-  });
-  // Apply automatically when user changes the select (cuts a click)
-  D.presetSelect?.addEventListener('change', () => {
-    applyPreset(D.presetSelect.value);
+  function runDetect() {
+    if (!state.imageData) {
+      showStageModal({ icon: '🖼', title: 'Load a file first', msg: 'Drop an image or video, then run detection.' });
+      return;
+    }
+    const region = D.detectRegion?.value || undefined;
+    const t0 = performance.now();
+    detectCandidates = detectWatermarks(state.imageData, { region });
+    detectIndex = 0;
+    const ms = Math.round(performance.now() - t0);
+    dbg.log(`Detect: ${detectCandidates.length} candidate(s) in ${ms}ms`);
+
+    if (!detectCandidates.length) {
+      D.btnDetectNext.hidden = true;
+      showStageModal({
+        icon: '🔍',
+        title: 'No watermark found',
+        msg: 'Nothing in this image looked like an overlaid badge. It may be very faint, or somewhere unusual — draw a rectangle over it instead, or narrow the search to one corner and try again.',
+      });
+      return;
+    }
+    paintDetected(detectCandidates[0]);
+    D.btnDetectNext.hidden = detectCandidates.length < 2;
+    toast(
+      detectCandidates.length > 1
+        ? `Found a likely watermark (${detectCandidates.length} candidates). Wrong one? Click "Not it? Try next".`
+        : 'Found a likely watermark. Adjust it with the brush if needed, then Remove.',
+      'success', 5000
+    );
+  }
+
+  D.btnDetect?.addEventListener('click', runDetect);
+  D.detectRegion?.addEventListener('change', runDetect);
+  D.btnDetectNext?.addEventListener('click', () => {
+    if (detectCandidates.length < 2) return;
+    detectIndex = (detectIndex + 1) % detectCandidates.length;
+    paintDetected(detectCandidates[detectIndex]);
+    toast(`Candidate ${detectIndex + 1} of ${detectCandidates.length}`, 'info', 2000);
   });
 
   // Hide the "drag a rectangle" hint as soon as the user starts drawing

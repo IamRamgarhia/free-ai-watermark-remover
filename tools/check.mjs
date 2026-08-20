@@ -33,6 +33,7 @@ const read = (p) => readFileSync(join(STATIC, p), 'utf8');
 
 const indexHtml = read('index.html');
 const aboutHtml = read('about.html');
+const guideHtml = read('guide.html');
 const swJs      = read('sw.js');
 const versionJs = read('js/version.js');
 const manifest  = JSON.parse(read('manifest.webmanifest'));
@@ -232,11 +233,23 @@ const manifest  = JSON.parse(read('manifest.webmanifest'));
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/<[^>]+>/g, ' ');
   const words = body.split(/\s+/).filter(w => /[A-Za-z]/.test(w)).length;
-  const MIN_WORDS = 700;
-  if (words < MIN_WORDS) {
-    fail('seo-content', `index.html has only ${words} indexable words (want >= ${MIN_WORDS})`);
+  // The editor page carries a short intro only — the depth lives on guide.html,
+  // because a tool page should get you to the tool rather than make you scroll
+  // past an essay. Both still need enough substance to be worth indexing.
+  const MIN_INDEX_WORDS = 250;
+  if (words < MIN_INDEX_WORDS) {
+    fail('seo-content', `index.html has only ${words} indexable words (want >= ${MIN_INDEX_WORDS})`);
   } else {
-    ok('seo-content', `index.html has ${words} indexable words`);
+    ok('seo-content', `index.html has ${words} indexable words (intro)`);
+  }
+  const guideWords = guideHtml
+    .replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<head[\s\S]*?<\/head>/i, '')
+    .replace(/<!--[\s\S]*?-->/g, '').replace(/<[^>]+>/g, ' ')
+    .split(/\s+/).filter(w => /[A-Za-z]/.test(w)).length;
+  if (guideWords < 700) {
+    fail('seo-content', `guide.html has only ${guideWords} indexable words (want >= 700)`);
+  } else {
+    ok('seo-content', `guide.html has ${guideWords} indexable words`);
   }
 
   const title = indexHtml.match(/<title>([\s\S]*?)<\/title>/)?.[1].trim() ?? '';

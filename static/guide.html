@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <!-- ===== Content Security Policy =====
+       Defence-in-depth: the ONNX runtime (jsDelivr) and the model (HuggingFace)
+       both come from third parties, so this pins exactly which origins the page
+       may load code and data from. Notes on the non-obvious bits:
+         'wasm-unsafe-eval' — required to compile the ONNX WebAssembly.
+         script-src blob:   — ORT runs inference in a Worker it builds at runtime
+                              (ort.env.wasm.proxy), and that worker dynamically
+                              import()s a blob URL. Dropping blob: here makes the
+                              WASM backend fail outright with "Failed to fetch
+                              dynamically imported module" — verified, not guessed.
+                              worker-src alone does NOT cover that import.
+         style-src unsafe-inline — inline style attributes (progress bar widths).
+                                   Scripts do NOT get unsafe-inline.
+         connect-src hf.co  — HuggingFace redirects model downloads to CDN subdomains.
+       frame-ancestors is not valid in a meta tag; sw.js sets it as a real header. -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    base-uri 'self';
+    object-src 'none';
+    form-action 'none';
+    script-src 'self' blob: 'wasm-unsafe-eval' https://cdn.jsdelivr.net;
+    worker-src 'self' blob:;
+    style-src 'self' 'unsafe-inline';
+    font-src 'self';
+    img-src 'self' data: blob:;
+    media-src 'self' blob:;
+    manifest-src 'self';
+    connect-src 'self' blob: data: https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co;
+  ">
+
+  <!-- ===== Primary SEO meta ===== -->
+  <!-- Title kept under ~60 chars so it isn't truncated in results, and leads
+       with the search term rather than the (unknown) brand name. -->
+  <title>How to Remove AI Watermarks — Guide &amp; FAQ | WatermarkOut</title>
+  <meta name="description" content="How to remove watermarks from Gemini, DALL·E, Midjourney, Firefly, Bing and Meta AI images. Supported formats, honest limits, privacy and FAQ.">
+  <meta name="author" content="Prince Ramgarhia (DiceCodes)">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://iamramgarhia.github.io/free-ai-watermark-remover/guide.html">
+
+  <!-- ===== Theme + PWA ===== -->
+  <meta name="theme-color" content="#7c3aed">
+  <meta name="application-name" content="WatermarkOut">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="WatermarkOut">
+  <meta name="format-detection" content="telephone=no">
+
+  <!-- ===== Open Graph (Facebook, LinkedIn, Slack, Discord previews) ===== -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://iamramgarhia.github.io/free-ai-watermark-remover/">
+  <meta property="og:title" content="Free AI Watermark Remover — Runs in Your Browser">
+  <meta property="og:description" content="Erase watermarks from AI images and short videos. The AI runs in your browser, so your files are never uploaded. Free, open source, no sign-up.">
+  <meta property="og:image" content="https://iamramgarhia.github.io/free-ai-watermark-remover/assets/social-preview.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="WatermarkOut — Free AI Watermark Remover">
+  <meta property="og:site_name" content="WatermarkOut">
+  <meta property="og:locale" content="en_US">
+
+  <!-- ===== Twitter / X Card ===== -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Free AI Watermark Remover — Runs in Your Browser">
+  <meta name="twitter:description" content="Remove watermarks from AI-generated images &amp; videos, entirely in your browser. Free, private, open source.">
+  <meta name="twitter:image" content="https://iamramgarhia.github.io/free-ai-watermark-remover/assets/social-preview.png">
+  <meta name="twitter:image:alt" content="WatermarkOut interface showing watermark removal">
+
+  <!-- ===== Manifest, icons, fonts ===== -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="assets/logo-icon.svg">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+
+  <!-- Fonts are self-hosted (see css/fonts.css) — no third-party request, so
+       the "your files never leave the browser" claim holds for the page too. -->
+  <link rel="stylesheet" href="css/fonts.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="brand">
+      <img src="assets/logo-icon.svg" alt="" class="brand-icon">
+      <span class="brand-name">WatermarkOut</span>
+    </div>
+    <nav class="topnav">
+      <a class="nav-btn" href="index.html">Editor</a>
+      <a class="nav-btn active" href="guide.html">Guide</a>
+      <a class="nav-btn" href="about.html">About</a>
+    </nav>
+  </header>
+
+  <article class="page-content">
+    <h1 class="guide-title">How to remove AI watermarks</h1>
+
+
+    <h2>Remove AI watermarks without uploading your files</h2>
+    <p>
+      Most online watermark removers work the same way: you upload your picture to
+      a company's server, they process it, and you hope their retention policy says
+      what you think it says. Many then charge a monthly subscription, or stamp
+      their <em>own</em> watermark onto the free-tier result.
+    </p>
+    <p>
+      WatermarkOut takes a different approach. The AI model runs inside your
+      browser tab using WebAssembly, so the picture you are editing never leaves
+      your device. There is no upload step, no account, no queue, and no server
+      that could keep a copy — because there is no server at all. The site is a
+      folder of static files, and the source is
+      <a href="https://github.com/IamRamgarhia/free-ai-watermark-remover" rel="noopener" target="_blank">public under the MIT licence</a>
+      if you want to check that claim rather than take it on trust.
+    </p>
+
+    <h2>Which watermarks it can remove</h2>
+    <p>
+      The tool ships with one-click presets for the badges the major image
+      generators add, because each one sits in a predictable spot at a predictable
+      size. Pick the matching preset and the mask is drawn for you:
+    </p>
+    <div class="content-table-wrap">
+      <table>
+        <thead>
+          <tr><th>Generator</th><th>What it stamps</th><th>Preset</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Google Gemini</td><td>Sparkle badge in a bottom corner</td><td>Gemini (bottom-right / bottom-left)</td></tr>
+          <tr><td>OpenAI DALL·E</td><td>Small text tag, or the DALL·E 2 colour bar</td><td>DALL·E bottom-right / colour bar</td></tr>
+          <tr><td>Midjourney</td><td>Credit strip along the bottom edge</td><td>Midjourney</td></tr>
+          <tr><td>Adobe Firefly</td><td>Rounded corner badge</td><td>Adobe Firefly</td></tr>
+          <tr><td>Bing Image Creator</td><td>Bing logo in the corner</td><td>Bing Image Creator</td></tr>
+          <tr><td>Meta AI</td><td>"Imagined with AI" badge</td><td>Meta AI</td></tr>
+          <tr><td>Stock photo sites</td><td>Repeating diagonal tiled pattern</td><td>Stock photo tiled grid</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      Anything else — a logo, a date stamp, a caption, an unwanted object — you can
+      mask by hand with the rectangle or brush tool. The AI does not care what the
+      thing is; it only sees the region you painted and fills it in from the
+      surrounding pixels.
+    </p>
+
+    <h2>How to remove a watermark</h2>
+    <ol>
+      <li><strong>Drop your file in</strong> — or click Browse. Nothing is uploaded; the file is read straight into the page.</li>
+      <li><strong>Mark the watermark.</strong> Choose a preset from the dropdown, or drag a rectangle over it. Use the brush for awkward shapes and the eraser to trim the mask back.</li>
+      <li><strong>Pick a quality setting.</strong> Balanced suits most images. Best runs a second refinement pass and takes roughly twice as long.</li>
+      <li><strong>Click Remove watermark</strong> and wait. Typically a few seconds on a modern machine.</li>
+      <li><strong>Compare and download.</strong> Press Space to flip between the original and the result, then save it as PNG, JPG or WebP.</li>
+    </ol>
+    <p>
+      A tighter mask almost always beats a loose one. Cover the watermark and a
+      few pixels of margin — not half the picture — and the fill will blend better.
+    </p>
+
+    <h2>Supported formats and limits</h2>
+    <ul>
+      <li><strong>Images:</strong> JPG, PNG, WebP and BMP, up to about 100&nbsp;MB.</li>
+      <li><strong>Video:</strong> MP4, WebM and MOV. Best for short clips; audio is preserved.</li>
+      <li><strong>Browsers:</strong> Chrome and Edge 90+, Firefox 90+, Safari 16.4+. WebGPU is used automatically where available and is considerably faster.</li>
+      <li><strong>Storage:</strong> roughly 250&nbsp;MB free space for the cached model and app.</li>
+    </ul>
+
+    <h2>Honest limitations</h2>
+    <p>
+      Inpainting is a reconstruction, not a recovery — the model invents plausible
+      pixels, it does not uncover what was hidden underneath. Where it struggles:
+    </p>
+    <div class="content-table-wrap">
+      <table>
+        <thead><tr><th>Limitation</th><th>Why</th><th>What helps</th></tr></thead>
+        <tbody>
+          <tr><td>Busy backgrounds — faces, small text, brickwork</td><td>A known weakness of this class of model</td><td>Use a tighter mask, or a desktop tool like <a href="https://github.com/Sanster/IOPaint" rel="noopener" target="_blank">IOPaint</a> for stubborn cases</td></tr>
+          <tr><td>Video uses one static patch</td><td>The AI runs once on a frame, then the clean patch is applied across the clip</td><td>Ideal for fixed corner watermarks; moving content behind the mark may show a static patch</td></tr>
+          <tr><td>Long videos are slow</td><td>Every frame is decoded and re-encoded in the browser</td><td>Trim the clip first</td></tr>
+          <tr><td>Very large images</td><td>A browser tab has a memory ceiling</td><td>Resize before loading</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>Is it really private?</h2>
+    <p>
+      Your images and videos never leave the browser — there is no endpoint to send
+      them to. Two things <em>are</em> fetched over the network, and it would be
+      dishonest not to name them: the app's own files, and a one-time
+      <strong>29&nbsp;MB AI model</strong> downloaded from Hugging Face on first
+      visit. The model is stored on your device and verified against a known
+      checksum each time, so it is never downloaded twice and never silently
+      swapped.
+    </p>
+    <p>
+      After that first load, the app works with no network connection at all. There
+      is no analytics, no error reporting, no cookies and no fonts or scripts
+      pulled from third-party trackers. You can verify all of this the same way we
+      do: open your browser's developer tools, watch the Network tab, and remove a
+      watermark.
+    </p>
+
+    <h2>Fair use</h2>
+    <div class="ethics-note">
+      <p>
+        This tool is meant for images you made or otherwise have the right to edit —
+        cleaning a preview badge off your own generated artwork, removing a logo from
+        a photo you own, tidying up your own footage.
+      </p>
+      <p>
+        Please don't use it to strip watermarks from someone else's copyrighted work,
+        to get around a stock library's licensing, or to pass AI-generated images off
+        as photographs. Provenance badges exist so people can tell what they are
+        looking at, and removing one to mislead somebody is a choice about honesty,
+        not about software. Check the terms of the service that generated your image
+        before you publish the result.
+      </p>
+    </div>
+
+    <h2>Questions</h2>
+
+    <div class="faq-item">
+      <h3>Is it actually free, or is there a catch?</h3>
+      <p>
+        Free, with no paid tier to upgrade to. It costs nothing to run because there
+        is no server — the site is hosted as static files and all the computing
+        happens on your own machine. There is nothing to meter and no usage to bill.
+      </p>
+    </div>
+
+    <div class="faq-item">
+      <h3>Does it put its own watermark on the result?</h3>
+      <p>No. You get the picture back with the masked area filled in and every other pixel untouched.</p>
+    </div>
+
+    <div class="faq-item">
+      <h3>Do my files get uploaded?</h3>
+      <p>
+        No. Files are read into the page and processed there. The only network
+        requests are the app's own files and the one-time model download described
+        above.
+      </p>
+    </div>
+
+    <div class="faq-item">
+      <h3>Does it work offline?</h3>
+      <p>
+        Yes, after the first visit. The app and the model are cached on your device,
+        so you can disconnect entirely and keep working. You can also install it as
+        an app from your browser's address bar.
+      </p>
+    </div>
+
+    <div class="faq-item">
+      <h3>Will it reduce my image quality?</h3>
+      <p>
+        Only inside the mask. Everything outside the region you painted is copied
+        through unchanged, pixel for pixel. Save as PNG to avoid adding any
+        compression of your own.
+      </p>
+    </div>
+
+    <div class="faq-item">
+      <h3>Why is the first visit slow?</h3>
+      <p>
+        It downloads the 29&nbsp;MB AI model once. After that it loads from your own
+        device and starts almost immediately. You can drop a file and mark up the
+        watermark while the model is still downloading.
+      </p>
+    </div>
+
+    <div class="faq-item">
+      <h3>Which AI model does it use?</h3>
+      <p>
+        <a href="https://github.com/Picsart-AI-Research/MI-GAN" rel="noopener" target="_blank">MI-GAN</a>,
+        an inpainting model from Picsart Research (ICCV 2023) built for running on
+        phones and in browsers. It runs through
+        <a href="https://onnxruntime.ai/docs/tutorials/web/" rel="noopener" target="_blank">ONNX Runtime Web</a>,
+        using your GPU via WebGPU where the browser supports it.
+      </p>
+    </div>
+
+    <div class="faq-item">
+      <h3>Can I remove a watermark from a video?</h3>
+      <p>
+        Yes, for short clips. The AI cleans one frame and that patch is applied
+        across the video, which works well for a fixed corner watermark. Audio is
+        kept. A mark that moves around the frame is not handled.
+      </p>
+    </div>
+
+    </article>
+
+  <footer class="site-footer">
+    <p>
+      <a href="index.html">Open the editor</a>
+      · <a href="about.html">About</a>
+      · <a href="https://github.com/IamRamgarhia/free-ai-watermark-remover" rel="noopener" target="_blank">Source on GitHub</a>
+      · MIT licensed
+    </p>
+  </footer>
+
+  <script type="module" src="js/about.js"></script>
+</body>
+</html>

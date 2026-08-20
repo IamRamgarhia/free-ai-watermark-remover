@@ -85,8 +85,9 @@ Most online watermark removers upload your private photos to a server you don't 
 | 🎬 Video watermark removal | MP4, WEBM, MOV — audio preserved, real-time playback preview |
 | 🤖 MI-GAN inpainting | Picsart Research ICCV 2023 model, 29 MB |
 | ✨ Watermark presets | Gemini, DALL·E, Midjourney, Bing, Firefly, Meta AI |
+| 🔍 Auto watermark detection | Finds the badge instead of assuming where it is |
 | 🎨 Manual masking | Rectangle, brush, eraser, undo — mouse **or** keyboard |
-| ⚙️ Quality control | Fast / Balanced / Best — Best runs a 2-pass coarse-to-fine refine |
+| ♻️ Recovery, not repaint | Solves for the picture under a see-through watermark |
 | 🔄 BEFORE/AFTER compare | Toggle to see original vs cleaned |
 | 🔒 Offline after first load | Your files are never uploaded; the app works with no connection |
 | 📱 Installable PWA | Desktop icon, standalone window, offline support |
@@ -136,18 +137,52 @@ Most online watermark removers upload your private photos to a server you don't 
 5. Run model. Output is `[-1, 1]` float32; map to `[0, 255]` via `(v * 0.5 + 0.5) * 255`.
 6. Composite into original at full resolution — only masked pixels are replaced, rest stays pixel-identical.
 
-**What the Quality setting actually does**
+**How removal actually works (two stages)**
 
-The model input is fixed at 512×512, so the *crop size* is what decides how much
-of that fixed budget lands on the watermark. A tighter crop is upscaled into the
-model, spending more capacity on the area you care about; a wider crop gives the
-GAN more surrounding texture to match against.
+Most generator badges are *semi-transparent*, which means the picture underneath
+them was never destroyed — it was blended:
 
-| Setting | Crop | Model runs |
-|---|---|---|
-| Fast | 2× the mask — tightest, sharpest detail | 1 |
-| Balanced | 3× the mask — best structural blending | 1 |
-| Best | 3× then 1.8× — coarse pass for structure, fine pass to sharpen | 2 (~2× slower) |
+```
+observed = alpha x watermark + (1 - alpha) x original
+```
+
+That inverts. So stage one estimates `alpha` per pixel (using a smooth
+interpolation of the surroundings purely as a baseline) and solves for the
+original. Texture — wood grain, skin, brick — comes back out of the real data
+instead of being repainted. Measured against ground truth on synthetic tests this
+scores 7-12 dB higher than filling the area with neighbouring colour.
+
+Stage two runs MI-GAN on whatever stage one could *not* recover: the fully opaque
+core, where no information about the original survives. For a typical translucent
+badge that residual is a few percent of the mask, and often nothing at all — in
+which case no pixels are invented anywhere.
+
+Set the mode to **Object / opaque logo** to skip stage one. Un-blending assumes
+the mask covers a translucent overlay; pointed at a solid object it would solve
+for meaningless values, so object removal goes straight to generative fill.
+
+**Finding the watermark**
+
+Earlier versions hardcoded each generator's badge as a fraction of the image
+("Gemini sits at 89% across, 89% down"). Those were guesses, and they could not
+survive a different aspect ratio or a restyled badge — in practice they drew the
+mask *beside* the watermark.
+
+**Detect watermark** now searches for it instead. A badge is a vector graphic
+composited over finished content, so it is compact, corner-anchored, and lighter
+or darker than its immediate surroundings in a way ordinary texture is not. The
+detector blurs at two scales and subtracts (a band-pass), thresholds adaptively,
+and scores the resulting blobs on size, compactness, contrast and corner
+proximity. No templates to maintain, and it catches badges we have never seen.
+
+It *proposes* a box rather than applying one silently, because it can be fooled by
+a genuinely badge-like object in a corner — hence "Not it? Try next".
+
+**Quality**
+
+The crop fed to the model is 512x512 at native resolution wherever the mask fits,
+so pixels go in and come back untouched. Quality therefore controls refinement
+passes, not crop scale: **Standard** is one pass, **High** is two.
 
 **Cross-Origin Isolation**
 
