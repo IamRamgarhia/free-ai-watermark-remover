@@ -43,6 +43,8 @@ jobs:
         run: node tools/test-detect.mjs
       - name: Un-blending recovery tests
         run: node tools/test-dewatermark.mjs
+      - name: Texture fill tests
+        run: node tools/test-texturefill.mjs
       - name: Static consistency checks
         run: node tools/check.mjs
       - name: Syntax-check every module

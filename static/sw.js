@@ -11,7 +11,7 @@
  * The AI model is NOT cached here — it lives in IndexedDB (see model-cache.js).
  */
 
-const CACHE_VERSION = 'watermarkout-v1.3.6';
+const CACHE_VERSION = 'watermarkout-v1.4.0';
 
 // Everything needed to render both pages with no network. If you add an asset
 // that either HTML file references, add it here too — otherwise it 404s for
@@ -33,6 +33,7 @@ const APP_SHELL = [
   './js/inpainter.js',
   './js/watermark-detect.js',
   './js/dewatermark.js',
+  './js/texturefill.js',
   './js/model-cache.js',
   './js/updates.js',
   './js/version.js',
