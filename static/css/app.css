@@ -301,7 +301,25 @@ body.app-page {
 .btn-lg { padding: 12px 20px; font-size: 14px; }
 .btn-icon { font-size: 14px; }
 
-.actions { display: flex; flex-direction: column; gap: 10px; }
+/* Remove / Download are the whole point of the page, so they must never
+   scroll out of reach. The sidebar scrolls vertically on desktop and
+   horizontally on mobile, so this sticks on both axes: bottom on desktop,
+   left on the mobile row. Sticky rather than fixed keeps it inside the
+   sidebar's own scroll context instead of floating over the canvas. */
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  /* Opaque, and padded past the sidebar's own padding, so cards scrolling
+     underneath are covered edge to edge rather than peeking out the sides. */
+  background: var(--bg-base);
+  margin: 0 -20px -20px;
+  padding: 12px 20px 20px;
+  border-top: 1px solid var(--border);
+}
 
 /* === Keyboard shortcuts hint === */
 .shortcuts-hint {
@@ -1445,6 +1463,20 @@ body.app-page {
     padding: 12px;
   }
   .sidebar .card { min-width: 240px; flex-shrink: 0; }
+  .actions {
+    /* Horizontal scroller: pin to the left edge, and put it first so the
+       primary action is what you see before scrolling anywhere. */
+    position: sticky;
+    left: 0;
+    bottom: auto;
+    order: -1;
+    min-width: 190px;
+    margin: 0;
+    padding: 0 12px 0 0;
+    border-top: none;
+    border-right: 1px solid var(--border);
+    justify-content: center;
+  }
   /* The toolbar has more controls than fit a phone; let it scroll sideways
      rather than wrap into a tall stack that pushes the canvas off screen. */
   .toolbar { overflow-x: auto; flex-wrap: nowrap; }
