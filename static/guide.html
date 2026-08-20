@@ -248,12 +248,13 @@
     </p>
     <p>
       <strong>Removing the visible badge removes the visible badge, and nothing
-      else.</strong> Independent testing of SynthID found it survived conversion to
-      greyscale, inversion, added noise, geometric distortion, AI upscaling,
-      repeated downscale-and-upscale cycles, photographing the screen, and over a
-      thousand rounds of iterative degradation. The only things that defeated it
-      also destroyed the image. Google's own settings page says the visible
-      watermark toggle "doesn't affect SynthID watermarks or Content Credentials".
+      else.</strong> Google designed SynthID to survive cropping, filters, colour
+      changes and lossy compression, and its own settings page states that the
+      visible-watermark toggle "doesn't affect SynthID watermarks or Content
+      Credentials". Because the signal is spread across the whole picture, editing
+      a corner leaves the overwhelming majority of it untouched. Google does say
+      SynthID "isn't foolproof against extreme image manipulations" — but the
+      manipulations in question are ones that wreck the image.
     </p>
     <p>
       One thing that <em>is</em> lost, unavoidably: saving a file from this tool
@@ -283,13 +284,16 @@
         not about software.
       </p>
       <p>
-        Two specifics worth knowing. <strong>xAI's Acceptable Use Policy expressly
+        One specific worth knowing: <strong>xAI's Acceptable Use Policy expressly
         forbids removing the watermark from Grok images</strong> — that is a term you
-        agreed to, not a grey area. And since August 2026 the EU AI Act and
-        California's AI Transparency Act both require AI providers to disclose
-        generated content, which is why several generators now let you turn the
-        visible badge off at source. If you have that option, using it is cleaner
-        than editing the image afterwards.
+        agreed to, not a grey area.
+      </p>
+      <p>
+        More generally, some generators now let you turn the visible badge off at
+        source — Google added exactly that option in August 2026. Where you have
+        that choice, taking it is cleaner than editing the image afterwards, and it
+        leaves the file's other provenance signals intact rather than looking like
+        an attempt to hide something.
       </p>
     </div>
 
