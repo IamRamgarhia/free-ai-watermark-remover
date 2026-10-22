@@ -264,11 +264,25 @@ exist. Both run in CI on every push and pull request.
 | **R** | Rectangle tool |
 | **B** | Brush tool |
 | **E** | Eraser tool |
+| **H** | Pan tool (drag to move a zoomed view) |
+| **+ / −** | Zoom in / out |
+| **0** | Fit the whole image |
+| **1** | Actual pixels (100%) |
 | **Space** | Toggle BEFORE / AFTER compare |
 | **Ctrl+Z** | Undo brush stroke |
 | **Esc** | Start over (with confirm) |
 | **D** | Download result |
 | **`** | Toggle the diagnostics panel |
+
+### Zooming in for precise masks
+
+Scroll over the image to zoom in at the cursor (trackpad pinch works too), or
+use the **− / + / Fit / 1:1** buttons in the toolbar. Right-drag or middle-drag
+pans with any tool; on touch screens, pinch to zoom and drag with the Pan tool.
+From about 300% the preview switches to crisp, unsmoothed pixels so you can see
+exactly where a watermark's edge is. The mask is always stored at the image's
+full resolution, so zoom only changes how precisely you can place it, never
+what gets processed.
 
 ### Drawing a mask without a mouse
 

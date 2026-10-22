@@ -686,6 +686,38 @@ body.app-page {
   min-height: 0;
   overflow: hidden;
   position: relative;
+  /* Drawing, panning and pinching are all handled in JS. Without this a touch
+     on the image scrolls or zooms the page instead of painting the mask. */
+  touch-action: none;
+}
+.stage.tool-pan #canvas-mask { cursor: grab; }
+.stage.is-panning,
+.stage.is-panning #canvas-mask { cursor: grabbing; }
+
+/* Brush outline that follows the pointer (positioned by app.js) */
+.brush-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+.zoom-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.zoom-level {
+  min-width: 46px;
+  text-align: center;
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 
 /* BEFORE/AFTER label that floats on top of the video result */
@@ -888,7 +920,17 @@ body.app-page {
   height: 100%;
   display: grid;
   place-items: center;
+  /* Centre the track itself too, so a zoomed image larger than the stage
+     overflows evenly on all sides and the pan offset is relative to centre. */
+  place-content: center;
   overflow: hidden;
+}
+/* The max-size caps are a safety net for before JS has sized the layers; once
+   the user zooms in, the layers are meant to be larger than the stage. */
+.stage.is-zoomed .canvas-wrap canvas,
+.stage.is-zoomed .canvas-wrap > video {
+  max-width: none;
+  max-height: none;
 }
 .canvas-wrap canvas {
   grid-column: 1;

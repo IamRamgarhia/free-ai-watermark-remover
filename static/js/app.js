@@ -6,6 +6,7 @@
 import { APP_VERSION } from './version.js';
 import { bindDropzone, imageToImageData } from './upload.js';
 import { MaskCanvas, dilateMask, maskHasContent } from './mask.js';
+import { Viewport } from './viewport.js';
 import * as inpainter from './inpainter.js';
 import { detectWatermarks, presetBoxes, scoreBox } from './watermark-detect.js';
 import { unblendWatermark, residualIsNegligible } from './dewatermark.js';
@@ -78,6 +79,11 @@ const D = {
   btnUndo: document.getElementById('btn-undo'),
   btnClearMask: document.getElementById('btn-clear-mask'),
   btnZoomFit: document.getElementById('btn-zoom-fit'),
+  btnZoomIn: document.getElementById('btn-zoom-in'),
+  btnZoomOut: document.getElementById('btn-zoom-out'),
+  btnZoom100: document.getElementById('btn-zoom-100'),
+  zoomLevel: document.getElementById('zoom-level'),
+  brushCursor: document.getElementById('brush-cursor'),
   btnClearModel: document.getElementById('btn-clear-model'),
   btnDetect: document.getElementById('btn-detect'),
   btnDetectNext: document.getElementById('btn-detect-next'),
@@ -348,6 +354,7 @@ async function onFileLoaded({ file, image, kind, error }) {
   D.btnStartOver.disabled = false;
 
   // Fit after the next layout pass so .stage has its real dimensions
+  getViewport()?.fit();
   scheduleFit();
 
   toast(kind === 'video'
@@ -441,39 +448,63 @@ function initMaskCanvasFor(w, h) {
   maskCanvas.setBrushSize(state.brushSize);
 }
 
-function fitCanvasToStage() {
-  // Computes the exact display size for the canvas stack so the entire image
-  // is always visible within the .stage element. We set inline CSS width/height
-  // on all canvases AND video elements so they all overlap correctly in the grid.
-  if (!D.canvasImage) return;
-  const stage = document.getElementById('stage');
-  if (!stage) return;
+// Zoom/pan state for the preview. Created lazily: the DOM lookups above run
+// at module load, and the stage only matters once a file is open.
+let viewport = null;
 
+function naturalSize() {
   // Use the intrinsic dimensions of whichever surface holds the source
-  let naturalW = 1, naturalH = 1;
   if (state.kind === 'video' && state.videoInfo) {
-    naturalW = state.videoInfo.width;
-    naturalH = state.videoInfo.height;
-  } else {
-    naturalW = D.canvasImage.width || state.imageData?.width || 1;
-    naturalH = D.canvasImage.height || state.imageData?.height || 1;
+    return { w: state.videoInfo.width, h: state.videoInfo.height };
   }
-  if (naturalW <= 1 || naturalH <= 1) return;
+  return {
+    w: D.canvasImage.width || state.imageData?.width || 1,
+    h: D.canvasImage.height || state.imageData?.height || 1,
+  };
+}
 
-  const stageRect = stage.getBoundingClientRect();
-  const padding = 16;
-  const maxW = Math.max(50, stageRect.width - padding * 2);
-  const maxH = Math.max(50, stageRect.height - padding * 2);
+function getViewport() {
+  if (viewport) return viewport;
+  const stage = document.getElementById('stage');
+  if (!stage || !D.canvasImage) return null;
+  viewport = new Viewport({
+    stage,
+    // Sized and moved together so they all overlap correctly in the grid.
+    layers: [D.canvasImage, D.canvasResult, D.canvasMask, D.videoOriginal, D.videoResult],
+    getNaturalSize: naturalSize,
+    onChange: (vp) => {
+      if (D.zoomLevel) D.zoomLevel.textContent = `${Math.round(vp.scale * 100)}%`;
+      if (D.btnZoomOut) D.btnZoomOut.disabled = vp.scale <= vp.minScale * 1.001;
+      updateBrushCursor();
+    },
+  });
+  viewport.panTool = state.tool === 'pan';
+  return viewport;
+}
 
-  const scale = Math.min(maxW / naturalW, maxH / naturalH, 1);
-  const displayW = Math.floor(naturalW * scale);
-  const displayH = Math.floor(naturalH * scale);
+function fitCanvasToStage() {
+  // Computes the display size for the canvas stack so the entire image is
+  // visible within the .stage element, or keeps the user's zoom if they have
+  // zoomed in. The Viewport sets inline width/height (and the pan transform)
+  // on all canvases AND video elements so they stay aligned.
+  getViewport()?.layout();
+}
 
-  for (const el of [D.canvasImage, D.canvasResult, D.canvasMask, D.videoOriginal, D.videoResult]) {
-    if (!el) continue;
-    el.style.width = displayW + 'px';
-    el.style.height = displayH + 'px';
-  }
+// Brush outline that follows the pointer at the brush's real on-screen size,
+// so you can see exactly what a dab will cover before you click.
+let lastPointer = null;
+function updateBrushCursor() {
+  const el = D.brushCursor;
+  if (!el) return;
+  const show = lastPointer && viewport && !state.showResult &&
+               (state.tool === 'brush' || state.tool === 'erase');
+  el.hidden = !show;
+  if (!show) return;
+  const stageRect = viewport.stage.getBoundingClientRect();
+  const d = Math.max(4, state.brushSize * viewport.scale);
+  el.style.width = el.style.height = d + 'px';
+  el.style.transform =
+    `translate(${lastPointer.x - stageRect.left - d / 2}px, ${lastPointer.y - stageRect.top - d / 2}px)`;
 }
 
 /**
@@ -1000,6 +1031,9 @@ function bindUI() {
       b.setAttribute('aria-pressed', 'true');   // .active is CSS-only; screen readers need this
       state.tool = b.dataset.tool;
       maskCanvas?.setTool(state.tool);
+      if (viewport) viewport.panTool = state.tool === 'pan';
+      document.getElementById('stage')?.classList.toggle('tool-pan', state.tool === 'pan');
+      updateBrushCursor();
       dbg.set('tool', state.tool);
     });
   });
@@ -1029,6 +1063,7 @@ function bindUI() {
     state.brushSize = +D.brushSize.value;
     D.brushSizeVal.textContent = state.brushSize;
     maskCanvas?.setBrushSize(state.brushSize);
+    updateBrushCursor();
   });
 
   D.maskExpand.addEventListener('input', () => {
@@ -1076,7 +1111,27 @@ function bindUI() {
   D.btnCompare.addEventListener('click', toggleCompare);
   D.btnUndo.addEventListener('click', () => maskCanvas?.undo());
   D.btnClearMask.addEventListener('click', () => maskCanvas?.clear());
-  D.btnZoomFit.addEventListener('click', fitCanvasToStage);
+  D.btnZoomFit.addEventListener('click', () => getViewport()?.fit());
+  D.btnZoomIn?.addEventListener('click', () => getViewport()?.zoomIn());
+  D.btnZoomOut?.addEventListener('click', () => getViewport()?.zoomOut());
+  D.btnZoom100?.addEventListener('click', () => getViewport()?.actualSize());
+
+  // Keyboard crosshair: keep it on screen while zoomed in.
+  D.canvasMask.addEventListener('mask:cursor', (e) => {
+    getViewport()?.ensureVisible(e.detail.x, e.detail.y);
+  });
+  // A second finger turned a stroke into a pinch: drop the half-made stroke.
+  document.getElementById('stage')?.addEventListener('viewport:gesture', () => {
+    maskCanvas?.cancelStroke();
+  });
+  D.canvasMask.addEventListener('pointermove', (e) => {
+    lastPointer = e.pointerType === 'touch' ? null : { x: e.clientX, y: e.clientY };
+    updateBrushCursor();
+  });
+  D.canvasMask.addEventListener('pointerleave', () => {
+    lastPointer = null;
+    updateBrushCursor();
+  });
 
   D.stageModalOk?.addEventListener('click', hideStageModal);
 
@@ -1269,9 +1324,25 @@ function bindUI() {
     }
 
     const key = e.key.toLowerCase();
-    const map = { b: 'brush', e: 'erase', r: 'rect' };
+    const map = { b: 'brush', e: 'erase', r: 'rect', h: 'pan' };
+    // Single-key shortcuts must not swallow browser ones: Ctrl+R is reload,
+    // Ctrl+/- is page zoom, Ctrl+0 resets it.
+    const plain = !e.ctrlKey && !e.metaKey && !e.altKey;
+    const editing = !!(state.image || state.videoInfo);
 
-    if (map[key]) {
+    if (plain && editing && (e.key === '+' || e.key === '=')) {
+      e.preventDefault();
+      getViewport()?.zoomIn();
+    } else if (plain && editing && (e.key === '-' || e.key === '_')) {
+      e.preventDefault();
+      getViewport()?.zoomOut();
+    } else if (plain && editing && e.key === '0') {
+      e.preventDefault();
+      getViewport()?.fit();
+    } else if (plain && editing && e.key === '1') {
+      e.preventDefault();
+      getViewport()?.actualSize();
+    } else if (plain && map[key]) {
       const btn = document.querySelector(`.tool-btn[data-tool="${map[key]}"]`);
       if (btn) {
         btn.click();
