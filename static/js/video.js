@@ -1,33 +1,41 @@
 /**
  * Video pipeline — pure browser, no ffmpeg.
  *
- * STRATEGY (post-debug rewrite):
+ * STRATEGY:
  *
- *   1. Run AI inpainting ONCE on the first frame to get the clean pixels for
- *      the masked region. This is the only expensive step.
+ *   1. Decide how to clean the watermark from the first frame (see
+ *      video-clean.js): exact Gemini removal, per-frame un-blending, or fill.
+ *      The AI runs on the first frame only if something needs filling.
  *
- *   2. Build a "patch canvas" — RGBA where the masked region holds those
- *      clean pixels and everything else is transparent.
- *
- *   3. Play the source video at 1× speed. On each decoded frame:
+ *   2. Play the source video at 1x speed. On each decoded frame:
  *        - draw the frame onto the output canvas
- *        - draw the patch on top (only paints the masked area)
+ *        - clean the crop around the mask from THIS frame's pixels, and
+ *          write it back
  *      Use requestVideoFrameCallback for frame-accurate, real-time capture.
  *
- *   4. MediaRecorder captures the output canvas at 30fps + the original audio
- *      track in real time. Result: a video of identical duration with the
- *      watermark replaced by the patch.
+ *   3. If the background around the mask has changed since the AI last ran,
+ *      pause the video AND the recorder, re-run the AI on the current frame,
+ *      and resume. Pausing both keeps the recording continuous, so the extra
+ *      time does not show up in the output.
+ *
+ *   4. MediaRecorder captures the output canvas + the original audio track.
+ *
+ * Earlier versions ran the AI once and pasted that patch onto every frame,
+ * which left a frozen rectangle wherever the scene moved behind the mark.
  *
  * Why playback-based instead of seek-based:
  *   MediaRecorder records in WALL-CLOCK time. captureStream(0) with manual
  *   requestFrame produced misshapen output (long duration, wrong fps) when
  *   the seek loop took longer than the video. Playback at 1× guarantees the
  *   output duration matches input.
- *
- * Total time:
- *   1× AI inference (~10–20s on WASM, ~2-3s on WebGPU) + video duration.
- *   A 10s clip → ~20–30s total. (No way to go faster without changing models.)
  */
+
+import { createFrameCleaner } from './video-clean.js';
+
+// Re-running the AI costs seconds each time, so cap how often a moving shot
+// can trigger it.
+const MIN_KEYFRAME_GAP_S = 1.0;
+const MAX_KEYFRAMES = 30;
 
 const PREFERRED_FPS = 30;
 
@@ -71,36 +79,9 @@ export async function grabFirstFrame(video) {
 }
 
 /**
- * Build a transparent-backed canvas where only the masked region holds the
- * inpainted clean pixels (with feathered alpha at edges for seamless blending).
- */
-function buildPatchCanvas(inpaintedImage, maskImage, featherRadius = 6) {
-  const { width: w, height: h } = inpaintedImage;
-  const patch = new ImageData(w, h);
-  for (let i = 0; i < w * h; i++) {
-    const a = maskImage.data[i * 4 + 3];
-    if (a > 16) {
-      patch.data[i * 4 + 0] = inpaintedImage.data[i * 4 + 0];
-      patch.data[i * 4 + 1] = inpaintedImage.data[i * 4 + 1];
-      patch.data[i * 4 + 2] = inpaintedImage.data[i * 4 + 2];
-      patch.data[i * 4 + 3] = 255;
-    }
-  }
-  const baseCanvas = new OffscreenCanvas(w, h);
-  baseCanvas.getContext('2d').putImageData(patch, 0, 0);
-
-  const featherCanvas = new OffscreenCanvas(w, h);
-  const fctx = featherCanvas.getContext('2d');
-  fctx.filter = `blur(${featherRadius}px)`;
-  fctx.drawImage(baseCanvas, 0, 0);
-  fctx.filter = 'none';
-  return featherCanvas;
-}
-
-/**
  * Process a video. Returns a Blob of the output video.
  */
-export async function processVideo({ video, maskImageData, inpaintFn, onProgress, opts = {} }) {
+export async function processVideo({ video, maskImageData, inpaintFn, mode = 'watermark', onProgress, opts = {} }) {
   const fps = opts.fps || PREFERRED_FPS;
   const width = video.videoWidth;
   const height = video.videoHeight;
@@ -120,21 +101,30 @@ export async function processVideo({ video, maskImageData, inpaintFn, onProgress
   refCtx.drawImage(video, 0, 0);
   const firstFrameImageData = refCtx.getImageData(0, 0, width, height);
 
-  onProgress?.(5, 'Running AI on reference frame (one-time)');
-  console.log('[video] Running LaMa on first frame');
+  onProgress?.(5, 'Analysing the watermark on the first frame');
   const aiStart = performance.now();
-  const inpaintedFirstFrame = await inpaintFn(firstFrameImageData, maskImageData);
-  console.log(`[video] First-frame AI done in ${((performance.now() - aiStart) / 1000).toFixed(1)}s`);
-
-  // ===== Step 2: Build patch =====
-  onProgress?.(12, 'Preparing patch');
-  const patchCanvas = buildPatchCanvas(inpaintedFirstFrame, maskImageData, 6);
+  const cleaner = await createFrameCleaner({
+    firstFrame: firstFrameImageData,
+    mask: maskImageData,
+    mode,
+    inpaint: inpaintFn,
+  });
+  const box = cleaner.box;
+  console.log(`[video] Method: ${cleaner.method}; first-frame prep ${((performance.now() - aiStart) / 1000).toFixed(1)}s`);
 
   // ===== Step 3: Set up output canvas + recording =====
   const outCanvas = document.createElement('canvas');
   outCanvas.width = width;
   outCanvas.height = height;
-  const outCtx = outCanvas.getContext('2d');
+  const outCtx = outCanvas.getContext('2d', { willReadFrequently: true });
+
+  // Draw a frame, clean the crop around the mask, write it back.
+  const renderFrame = () => {
+    outCtx.drawImage(video, 0, 0, width, height);
+    const region = outCtx.getImageData(box.x, box.y, box.w, box.h);
+    outCtx.putImageData(cleaner.clean(region), box.x, box.y);
+    return region;
+  };
 
   // captureStream(fps) — automatic capture at the requested rate
   const canvasStream = outCanvas.captureStream(fps);
@@ -181,10 +171,11 @@ export async function processVideo({ video, maskImageData, inpaintFn, onProgress
 
   // Draw first frame BEFORE starting recorder so it's not blank
   await new Promise(r => video.addEventListener('seeked', r, { once: true }));
-  outCtx.drawImage(video, 0, 0, width, height);
-  outCtx.drawImage(patchCanvas, 0, 0);
+  renderFrame();
 
   recorder.start();
+  let lastKeyframeAt = 0;
+  let busy = false;
 
   // Use requestVideoFrameCallback when available — gives us frame-accurate timing.
   const useVFC = typeof video.requestVideoFrameCallback === 'function';
@@ -195,9 +186,33 @@ export async function processVideo({ video, maskImageData, inpaintFn, onProgress
     let lastReportedPct = 15;
     const playStart = performance.now();
 
-    function onFrame() {
+    async function onFrame() {
+      if (busy) return;
       outCtx.drawImage(video, 0, 0, width, height);
-      outCtx.drawImage(patchCanvas, 0, 0);
+      const region = outCtx.getImageData(box.x, box.y, box.w, box.h);
+
+      // The scene behind the mark has moved on from what the AI last saw:
+      // pause everything, refresh the AI patch from this frame, carry on.
+      if (cleaner.wantsKeyframe(region) &&
+          cleaner.keyframes < MAX_KEYFRAMES &&
+          video.currentTime - lastKeyframeAt >= MIN_KEYFRAME_GAP_S) {
+        busy = true;
+        video.pause();
+        if (recorder.state === 'recording') recorder.pause();
+        onProgress?.(15 + (video.currentTime / duration) * 83, `Scene changed — refreshing fill at ${video.currentTime.toFixed(1)}s`);
+        try {
+          await cleaner.keyframe(outCtx.getImageData(0, 0, width, height));
+        } catch (e) {
+          console.warn('[video] keyframe failed, continuing with smooth fill', e);
+        }
+        lastKeyframeAt = video.currentTime;
+        armSafety();   // the AI time is not playback time
+        if (recorder.state === 'paused') recorder.resume();
+        busy = false;
+        video.play().catch(() => {});
+      }
+
+      outCtx.putImageData(cleaner.clean(region), box.x, box.y);
       frameCount++;
       const elapsed = (performance.now() - playStart) / 1000;
       const progress = Math.min(98, 15 + (video.currentTime / duration) * 83);
@@ -209,16 +224,23 @@ export async function processVideo({ video, maskImageData, inpaintFn, onProgress
       if (useVFC && !video.ended) {
         video.requestVideoFrameCallback(onFrame);
       }
+      if (video.ended) resolve();
     }
 
-    video.addEventListener('ended', () => resolve(), { once: true });
+    video.addEventListener('ended', () => { clearTimeout(safetyTimer); resolve(); }, { once: true });
     video.addEventListener('error', () => reject(new Error('Video playback error')), { once: true });
 
-    // Safety timeout: 3× video duration max
-    const safetyTimer = setTimeout(() => {
-      console.warn('[video] Safety timeout hit — stopping recording');
-      resolve();
-    }, (duration + 5) * 3 * 1000);
+    // Safety timeout: 3× video duration of playback, re-armed after each AI
+    // refresh so a moving shot that needs several is not cut off.
+    let safetyTimer = null;
+    function armSafety() {
+      clearTimeout(safetyTimer);
+      safetyTimer = setTimeout(() => {
+        console.warn('[video] Safety timeout hit — stopping recording');
+        resolve();
+      }, (duration + 5) * 3 * 1000);
+    }
+    armSafety();
 
     if (useVFC) {
       video.requestVideoFrameCallback(onFrame);

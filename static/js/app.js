@@ -9,7 +9,8 @@ import { MaskCanvas, dilateMask, maskHasContent } from './mask.js';
 import { Viewport } from './viewport.js';
 import * as inpainter from './inpainter.js';
 import { detectWatermarks, presetBoxes, scoreBox } from './watermark-detect.js';
-import { unblendWatermark, residualIsNegligible } from './dewatermark.js';
+import { unblendWatermark, residualIsNegligible, maskBbox } from './dewatermark.js';
+import { findGeminiWatermark, removeGeminiWatermark } from './gemini-template.js';
 import { textureFill } from './texturefill.js';
 import { registerServiceWorker } from './updates.js';
 import { toast } from './toast.js';
@@ -229,17 +230,21 @@ async function bootstrap() {
 }
 
 /**
- * Remove needs BOTH a loaded file and a ready model. The editor is now usable
- * before the model arrives, so this is the single place that decides whether
- * the button is live, rather than each load path guessing.
+ * Remove needs a loaded file, and — for object mode — a ready model. Watermark
+ * mode mostly does not need the model at all: the Gemini mark is inverted
+ * exactly and translucent marks are un-blended, and only an opaque remainder
+ * has to be AI-filled. So that mode is usable while the model is still
+ * downloading, or if it never loads. This is the single place that decides
+ * whether the button is live, rather than each load path guessing.
  */
 function updateRemoveEnabled() {
   if (!D.btnRemove) return;
   const hasFile = !!state.imageData;
-  D.btnRemove.disabled = !(hasFile && state.modelReady);
+  const usable = state.modelReady || state.mode === 'watermark';
+  D.btnRemove.disabled = !(hasFile && usable);
   D.btnRemove.title = !hasFile
     ? 'Drop an image or video first'
-    : !state.modelReady
+    : !usable
       ? 'Waiting for the AI model to finish loading…'
       : 'Remove the watermark inside your mask';
 }
@@ -682,9 +687,9 @@ async function runRemoval() {
     passes: inpainter.getPassCount(state.quality),
   });
 
-  if (!(await inpainter.isReady())) {
+  if (state.mode === 'object' && !(await inpainter.isReady())) {
     D.btnRemove.classList.remove('loading');
-    showStageModal({ icon: '⏳', title: 'AI model still loading', msg: 'Give it a few more seconds and try again.' });
+    showStageModal({ icon: '⏳', title: 'AI model still loading', msg: 'Removing an object needs the AI model. Give it a few more seconds and try again.' });
     dbg.warn('Inpainter not ready when Remove clicked');
     return;
   }
@@ -693,7 +698,7 @@ async function runRemoval() {
   D.processingOverlay.hidden = false;
   D.processingTitle.textContent = state.kind === 'video' ? 'Removing watermark from video…' : 'Removing watermark…';
   D.processingSub.textContent = state.kind === 'video'
-    ? 'AI runs ONCE on the first frame, then we paint the clean pixels onto every frame. Much faster than per-frame AI.'
+    ? 'Every frame is cleaned from its own pixels as the clip plays. If the scene behind the mark changes, the AI re-runs on that frame.'
     : 'This stays on-screen until done. You can keep this tab open in the background.';
   D.processingFill.style.width = '5%';
   D.processingStage.textContent = 'Preparing mask';
@@ -714,8 +719,8 @@ async function runRemoval() {
 
   // Estimate. Scales with the number of model runs the chosen quality costs
   // ("Best" is a two-pass coarse-to-fine refine, so it's ~2× "Balanced").
-  // For videos: the AI runs once on the first frame (static-mask optimization),
-  // then ~1.5× video duration for seeking + compositing every frame.
+  // For videos: the AI runs on the first frame (and again only if the scene
+  // behind the mark changes), then ~1.5× video duration for playback.
   const isWebGPU = inpainter.getBackend() === 'webgpu';
   const baseTime = (isWebGPU ? 3 : 20) * inpainter.getPassCount(state.quality);
   const expected = state.kind === 'video'
@@ -736,7 +741,7 @@ async function runRemoval() {
     D.processingStage.textContent = '';
     setTimeout(() => { D.processingOverlay.hidden = true; }, 1300);
     D.btnDownload.disabled = false;
-    setStatus(`Ready (${inpainter.getBackend()})`, 'ready');
+    setStatus(state.modelReady ? `Ready (${inpainter.getBackend()})` : 'Done — AI model not loaded', 'ready');
     dbg.log('Remove finished successfully');
   } catch (e) {
     stopProgress();
@@ -782,10 +787,24 @@ async function runImageRemoval(maskData) {
     D.processingStage.textContent = 'Separating the watermark from the image…';
     // Yield so the overlay actually paints before this blocks the thread.
     await new Promise(r => setTimeout(r, 0));
-    recovery = unblendWatermark(state.imageData, maskData);
+
+    // A known watermark with a calibrated alpha map can be inverted exactly.
+    // Only when the user's mask covers most of it — the mask is the user
+    // telling us where the watermark is. The whole sparkle is then removed,
+    // including faint arms a tight mask may have clipped; nothing beyond the
+    // sparkle's own footprint changes.
+    const gemini = findGeminiInMask(state.imageData, maskData);
+    if (gemini) {
+      recovery = removeGeminiWatermark(state.imageData, gemini);
+      dbg.log(`Gemini watermark (${gemini.variant}, ${gemini.size}px) at ${gemini.x},${gemini.y}: ` +
+              `match ${gemini.score.toFixed(2)}, gain ${recovery.stats.gain.toFixed(2)}, ` +
+              `${recovery.stats.opaque} clipped px`);
+    } else {
+      recovery = unblendWatermark(state.imageData, maskData);
+    }
     source = recovery.result;
     fillMask = recovery.residualMask;
-    dbg.log(recovery.stats.fellBack
+    if (!gemini) dbg.log(recovery.stats.fellBack
       ? 'Un-blend: not a translucent overlay — filling the whole mask instead'
       : `Un-blend: recovered ${recovery.stats.recovered} px, ` +
         `${recovery.stats.opaque} px too opaque ` +
@@ -816,6 +835,10 @@ async function runImageRemoval(maskData) {
       dbg.log(`Texture fill: copied from offset ${tex.offset.dx},${tex.offset.dy} (confidence ${tex.confidence.toFixed(2)})`);
     } else {
       dbg.log(`Texture fill declined (confidence ${tex.confidence.toFixed(2)}) — using the AI model`);
+      if (!(await inpainter.isReady())) {
+        throw new Error('Part of this watermark is fully opaque and has to be filled by the AI model, ' +
+                        'which has not finished loading. Wait a few seconds and try again.');
+      }
       D.processingStage.textContent = 'Filling what could not be recovered…';
       result = await inpainter.inpaint(source, fillMask, {
         quality: state.quality,
@@ -842,12 +865,32 @@ async function runImageRemoval(maskData) {
   setPreviewLabel('after');
 
   dbg.log(`Removal done in ${(tMs / 1000).toFixed(1)}s`);
-  const how = recovery && !needsFill
+  const how = recovery?.stats.method === 'gemini-template'
+    ? (needsFill ? 'Gemini watermark removed exactly, a few clipped pixels filled'
+                 : 'Gemini watermark removed exactly — original pixels restored')
+    : recovery && !needsFill
     ? 'recovered from under the watermark — no pixels invented'
     : recovery
       ? `${(100 - recovery.stats.residualFraction * 100).toFixed(0)}% recovered, the rest filled in`
       : 'filled in';
   toast(`Done in ${(tMs / 1000).toFixed(1)}s — ${how}. Click Download.`, 'success', 5000);
+}
+
+/**
+ * The Gemini watermark, if it is what the mask covers. Searches the masked
+ * area (capped, so a huge freehand mask doesn't turn into a slow full scan)
+ * and requires most of the match to sit inside the mask.
+ */
+function findGeminiInMask(imageData, maskData) {
+  const box = maskBbox(maskData, 0);
+  if (!box) return null;
+  const within = Math.max(box.w, box.h) <= 400 ? box : null;
+  const m = findGeminiWatermark(imageData, { within });
+  if (!m) return null;
+  const x0 = Math.max(m.x, box.x), y0 = Math.max(m.y, box.y);
+  const x1 = Math.min(m.x + m.size, box.x + box.w), y1 = Math.min(m.y + m.size, box.y + box.h);
+  const inside = Math.max(0, x1 - x0) * Math.max(0, y1 - y0) / (m.size * m.size);
+  return inside >= 0.5 ? m : null;
 }
 
 async function runVideoRemoval(maskData) {
@@ -873,7 +916,10 @@ async function runVideoRemoval(maskData) {
   const blob = await processVideo({
     video,
     maskImageData: maskData,
-    inpaintFn: inpaintFrame,
+    // Without the model, anything that needs filling gets a smooth fill that
+    // still follows the scene; Gemini and translucent marks need no model.
+    inpaintFn: (await inpainter.isReady()) ? inpaintFrame : undefined,
+    mode: state.mode,
     onProgress: (pct, stage) => {
       D.processingFill.style.width = `${pct.toFixed(1)}%`;
       D.processingStage.textContent = stage;
@@ -1092,6 +1138,7 @@ function bindUI() {
   document.querySelectorAll('input[name="mode"]').forEach(r => {
     r.addEventListener('change', () => {
       state.mode = r.value;
+      updateRemoveEnabled();
       if (modeHint) modeHint.textContent = MODE_HINTS[r.value] || '';
       dbg.set('mode', r.value);
     });
@@ -1186,7 +1233,9 @@ function bindUI() {
     if (!c) return;
     paintBox(c);
     D.btnDetectNext.hidden = candidates.length < 2;
-    const label = c.source === 'preset'
+    const label = c.source === 'gemini'
+      ? `Gemini watermark — exact match (${c.profile})`
+      : c.source === 'preset'
       ? (c.corroborated ? `found ${c.profile}` : `preset ${c.profile}`)
       : 'detected';
     if (D.detectStatus) {
@@ -1259,6 +1308,19 @@ function bindUI() {
       .map(d => ({ ...d, source: 'detected' }));
 
     candidates = [...confirmed, ...orphans, ...unconfirmed];
+
+    // The exact Gemini sparkle beats any guess: when it is there, it goes
+    // first, and boxes that are just approximations of it are dropped.
+    if (corner === 'bottom-right') {
+      const g = findGeminiWatermark(state.imageData);
+      if (g) {
+        const gBox = { x: g.x, y: g.y, w: g.size, h: g.size };
+        candidates = [
+          { ...gBox, source: 'gemini', profile: `${g.size}px` },
+          ...candidates.filter(c => iouBox(c, gBox) < 0.3),
+        ];
+      }
+    }
     candidateIndex = 0;
     dbg.log(`Find: ${detected.length} detected, ${confirmed.length} confirmed preset(s), ${candidates.length} candidates (${corner})`);
 

@@ -209,7 +209,7 @@
         <thead><tr><th>Limitation</th><th>Why</th><th>What helps</th></tr></thead>
         <tbody>
           <tr><td>Busy backgrounds — faces, small text, brickwork</td><td>A known weakness of this class of model</td><td>Use a tighter mask, or a desktop tool like <a href="https://github.com/Sanster/IOPaint" rel="noopener" target="_blank">IOPaint</a> for stubborn cases</td></tr>
-          <tr><td>Video uses one static patch</td><td>The AI runs once on a frame, then the clean patch is applied across the clip</td><td>Ideal for fixed corner watermarks; moving content behind the mark may show a static patch</td></tr>
+          <tr><td>Video is processed in real time</td><td>Every frame is cleaned as the clip plays; the AI re-runs when the scene behind the mark changes</td><td>Gemini and translucent marks are restored from each frame's own pixels; opaque marks on fast-moving shots get a smoother fill between AI refreshes</td></tr>
           <tr><td>Long videos are slow</td><td>Every frame is decoded and re-encoded in the browser</td><td>Trim the clip first</td></tr>
           <tr><td>Very large images</td><td>A browser tab has a memory ceiling</td><td>Resize before loading</td></tr>
         </tbody>
