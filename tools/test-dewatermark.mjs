@@ -11,6 +11,13 @@
  * Crucially, each test also computes what a smooth "fill from nearby colours"
  * would have scored on the same image. If un-blending is not clearly better
  * than that baseline, it is not earning its place.
+ *
+ * The baseline must be a FAIR one. An earlier version of this file started its
+ * "smooth fill" from the watermark's own bright pixels and stopped before it
+ * converged, so it scored ~11-16 dB and un-blending "beat" it by 10 dB, while
+ * un-blending was in fact returning that same smooth fill (23.6 dB vs 23.6 dB,
+ * texture correlation 0.2). So the baseline below is seeded and converged, and
+ * every recovery test also checks that the texture itself came back.
  */
 
 import { unblendWatermark, residualIsNegligible } from '../static/js/dewatermark.js';
@@ -91,28 +98,54 @@ function psnr(a, b, mask) {
   return mse === 0 ? Infinity : 10 * Math.log10((255 * 255) / mse);
 }
 
-/** Baseline: what "fill with nearby colours" achieves — the thing to beat. */
+/**
+ * Baseline: what "fill with nearby colours" achieves — the thing to beat.
+ * Seeded with the surrounding mean and relaxed to convergence, in floats.
+ */
 function smoothFillBaseline(watermarked, mask) {
   const out = clone(watermarked);
   const { width: w, height: h } = out;
-  for (let it = 0; it < 300; it++) {
-    const prev = new Uint8ClampedArray(out.data);
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
+  const f = new Float32Array(out.data);
+  const sum = [0, 0, 0]; let n = 0;
+  for (let i = 0; i < f.length; i += 4) {
+    if (mask.data[i + 3] > 64) continue;
+    for (let c = 0; c < 3; c++) sum[c] += f[i + c];
+    n++;
+  }
+  for (let i = 0; i < f.length; i += 4) {
+    if (mask.data[i + 3] > 64) for (let c = 0; c < 3; c++) f[i + c] = sum[c] / n;
+  }
+  for (let it = 0; it < 3000; it++) {
+    const prev = f.slice();
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
         const o = (y * w + x) * 4;
         if (mask.data[o + 3] <= 64) continue;
         for (let c = 0; c < 3; c++) {
-          let acc = 0, cnt = 0;
-          if (x > 0)     { acc += prev[o - 4 + c]; cnt++; }
-          if (x < w - 1) { acc += prev[o + 4 + c]; cnt++; }
-          if (y > 0)     { acc += prev[o - w * 4 + c]; cnt++; }
-          if (y < h - 1) { acc += prev[o + w * 4 + c]; cnt++; }
-          out.data[o + c] = acc / cnt;
+          f[o + c] = (prev[o - 4 + c] + prev[o + 4 + c] + prev[o - w * 4 + c] + prev[o + w * 4 + c]) / 4;
         }
       }
     }
   }
+  for (let i = 0; i < f.length; i++) out.data[i] = f[i];
   return out;
+}
+
+/**
+ * How much of the ORIGINAL texture came back: correlation of (result - smooth)
+ * with (original - smooth) inside the mask. 1 = all of it, 0 = none (a smear).
+ */
+function textureRecovered(result, original, smooth, mask) {
+  let a = 0, b = 0, ab = 0;
+  for (let i = 0; i < result.data.length; i += 4) {
+    if (mask.data[i + 3] <= 64) continue;
+    for (let c = 0; c < 3; c++) {
+      const p = result.data[i + c] - smooth.data[i + c];
+      const q = original.data[i + c] - smooth.data[i + c];
+      a += p * p; b += q * q; ab += p * q;
+    }
+  }
+  return ab / Math.sqrt(a * b + 1e-9);
 }
 
 // === Tests =================================================================
@@ -136,18 +169,58 @@ for (const { label, alpha } of scenarios) {
     const pRec = psnr(result, original, mask);
     const pBase = psnr(baseline, original, mask);
     const pRaw = psnr(wm, original, mask);
+    const tex = textureRecovered(result, original, baseline, mask);
 
     console.log(`  ${label}:  un-blend ${pRec.toFixed(1)} dB` +
                 `  |  smooth fill ${pBase.toFixed(1)} dB` +
                 `  |  untouched ${pRaw.toFixed(1)} dB` +
-                `  (alpha est ${stats.meanAlpha.toFixed(2)})`);
+                `  |  texture recovered ${tex.toFixed(2)}`);
 
-    assert(pRec > pBase + 3,
+    assert(pRec > pBase + 1.5,
       `only ${pRec.toFixed(1)} dB vs baseline ${pBase.toFixed(1)} dB — not clearly better`);
+    assert(tex > 0.5, `texture correlation ${tex.toFixed(2)}: this is a smear, not a recovery`);
     assert(pRec > pRaw + 6,
       `barely improved on doing nothing (${pRec.toFixed(1)} vs ${pRaw.toFixed(1)} dB)`);
   });
 }
+
+test('beats smooth fill on shaded texture under a flat-opacity badge', () => {
+  // The case that exposed per-pixel alpha estimates: large-scale shading plus
+  // strong grain. Local estimates soaked the grain into alpha and lost to a
+  // plain blur; the pooled single-opacity estimate must not.
+  const W = 400, H = 200;
+  const original = new ImageData(new Uint8ClampedArray(W * H * 4), W, H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      const g = Math.sin(x * 0.2 + Math.sin(y * 0.05) * 3) * 30, f = (hash(x, y) - 0.5) * 20, sh = Math.sin(x * 0.01) * 40;
+      original.data[i] = 130 + g + f + sh; original.data[i + 1] = 110 + g + f + sh;
+      original.data[i + 2] = 90 + g * 0.5 + f; original.data[i + 3] = 255;
+    }
+  }
+  const wm = clone(original);
+  const mask = new ImageData(new Uint8ClampedArray(W * H * 4), W, H);
+  for (let y = 80; y < 120; y++) {
+    for (let x = 100; x < 220; x++) {
+      const i = (y * W + x) * 4;
+      for (let c = 0; c < 3; c++) wm.data[i + c] = 255 * 0.5 + wm.data[i + c] * 0.5;
+      mask.data[i + 3] = 255;
+    }
+  }
+  const { result } = unblendWatermark(wm, mask);
+  const pRec = psnr(result, original, mask), pBase = psnr(smoothFillBaseline(wm, mask), original, mask);
+  console.log(`  shaded wood, flat badge:  un-blend ${pRec.toFixed(1)} dB  |  smooth fill ${pBase.toFixed(1)} dB`);
+  assert(pRec > pBase + 3, `${pRec.toFixed(1)} dB vs smooth ${pBase.toFixed(1)} dB`);
+});
+
+test('a known alpha map is reused exactly (video path)', () => {
+  const original = makeOriginal(160, 160);
+  const wm = clone(original);
+  const mask = applyWatermark(wm, 80, 80, 18, 0.5);
+  const first = unblendWatermark(wm, mask);
+  const again = unblendWatermark(wm, mask, { alpha: first.alpha });
+  assert(psnr(first.result, again.result) === Infinity, 'reusing the alpha map changed the result');
+});
 
 console.log('\nBehaviour');
 

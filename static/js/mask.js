@@ -110,6 +110,10 @@ export class MaskCanvas {
     c.addEventListener('pointermove', (e) => this._onMove(e));
     c.addEventListener('pointerup',   (e) => this._onUp(e));
     c.addEventListener('pointerleave', (e) => this._onUp(e));
+    // A touch that turns into a scroll or system gesture ends with
+    // pointercancel and no pointerup; without this the next touch would
+    // continue a stroke that already ended.
+    c.addEventListener('pointercancel', (e) => this._onUp(e));
     // prevent context menu so right-click pan doesn't fight
     c.addEventListener('contextmenu', (e) => e.preventDefault());
 
@@ -197,6 +201,10 @@ export class MaskCanvas {
       this.kbCursor.x = Math.max(0, Math.min(w, this.kbCursor.x + dx));
       this.kbCursor.y = Math.max(0, Math.min(h, this.kbCursor.y + dy));
       this._drawKbOverlay();
+      // Let a zoomed view follow the crosshair instead of losing it off-screen.
+      this.canvas.dispatchEvent(new CustomEvent('mask:cursor', {
+        detail: { x: this.kbCursor.x, y: this.kbCursor.y }, bubbles: true,
+      }));
     };
 
     switch (e.key) {
@@ -227,6 +235,7 @@ export class MaskCanvas {
 
   /** Enter/Space: place a brush dab, or set/complete a rectangle. */
   _kbCommit() {
+    if (this.tool === 'pan') return;   // the hand tool never paints
     const { x, y } = this.kbCursor;
 
     if (this.tool === 'rect') {
@@ -282,7 +291,7 @@ export class MaskCanvas {
   }
 
   _onDown(e) {
-    if (e.button !== 0) return;
+    if (e.button !== 0 || this.tool === 'pan') return;
     // Pointer takes over: drop the keyboard crosshair so it can't be baked in.
     this._hideKbOverlay();
     this.kbAnchor = null;
@@ -319,6 +328,18 @@ export class MaskCanvas {
     this.isDrawing = false;
     this.rectPreviewSnapshot = null;
     try { this.canvas.releasePointerCapture(e.pointerId); } catch {}
+  }
+
+  /**
+   * Abandon the stroke in progress and restore the mask from before it.
+   * Used when a one-finger stroke turns out to be the start of a pinch.
+   */
+  cancelStroke() {
+    if (!this.isDrawing) return;
+    this.isDrawing = false;
+    this.rectPreviewSnapshot = null;
+    const snap = this.undoStack.pop();   // pushed by _onDown for this stroke
+    if (snap) this.ctx.putImageData(snap, 0, 0);
   }
 
   _drawCircle(x, y, radius) {

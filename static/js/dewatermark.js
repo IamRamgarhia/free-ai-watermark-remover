@@ -33,13 +33,25 @@
  *
  * `alpha`: we need the background that lies *under* the badge. We estimate only
  * its LOW-FREQUENCY component by diffusing surrounding colour inward (a discrete
- * Laplace solve). That sounds like the very "fill with nearby colours" this is
- * meant to avoid — the crucial difference is that we do not use that fill as the
- * output. We use it only as a baseline to solve for alpha, and then the actual
- * detail comes back out of the observed pixels. The interpolation supplies the
- * illumination level; the real data supplies the texture.
+ * Laplace solve), and from it a raw per-pixel alpha:
  *
- *     alpha = (observed - background) / (watermark - background)
+ *     alpha_raw = (observed - background) / (watermark - background)
+ *
+ * That raw alpha must NOT be used directly. Substituting it back into the
+ * inversion gives exactly `background` for every pixel: the pixel's own texture
+ * is absorbed into its alpha and cancels out. An earlier version did this and
+ * its output was, measurably, the smooth diffusion fill and nothing more
+ * (same PSNR, texture correlation 0.2).
+ *
+ * The fix is to use what we know about the two signals. Texture is
+ * high-frequency and zero-mean around the background; a badge's alpha is
+ * locally flat with edges. A median over a small window keeps the edges and
+ * rejects the texture, so the alpha it yields is the badge's, and the
+ * texture then comes back out of the observed pixels in the inversion.
+ *
+ * This is still an estimate from one image. When the exact alpha map of a
+ * known watermark is available (see gemini-template.js) that is used instead
+ * and the recovery is essentially exact.
  *
  * WHERE THIS HONESTLY CANNOT WIN
  * ------------------------------
@@ -56,6 +68,15 @@
  * @param {object} [opts]
  * @param {number} [opts.maxAlpha=0.85]  above this the pixel is treated as opaque
  * @param {number} [opts.pad=6]          extra context sampled around the mask
+ * @param {number} [opts.alphaRadius=3]  median window radius for the alpha map
+ * @param {Float32Array} [opts.background] background from a previous call on
+ *        the same mask (video: the previous frame). Warm-starts the solve.
+ * @param {number} [opts.iterations]     cap on relaxation passes
+ * @param {{map: Float32Array, wmValue: number}} [opts.alpha] a known alpha map
+ *        for this mask (as returned in `alpha` by an earlier call). Skips the
+ *        estimate. Video estimates once and reuses it on every frame: the
+ *        overlay does not change between frames, and averaging estimates from
+ *        several frames cancels the texture leakage of any single one.
  * @returns {{ result: ImageData, residualMask: ImageData, stats: object }}
  *          `result` has the watermark un-blended away; `residualMask` marks the
  *          pixels that were too opaque to recover and still need inpainting.
@@ -68,6 +89,7 @@ export function unblendWatermark(imageData, maskData, opts = {}) {
   // rather than to amplify noise and call it detail.
   const maxAlpha = opts.maxAlpha ?? 0.85;
   const pad = opts.pad ?? 6;
+  const alphaRadius = opts.alphaRadius ?? 3;
   const { width: W, height: H } = imageData;
 
   const bbox = maskBbox(maskData, pad);
@@ -96,21 +118,61 @@ export function unblendWatermark(imageData, maskData, opts = {}) {
     }
   }
 
-  // --- Background under the mark, by inward diffusion ----------------------
-  const bg = diffuseInward(obs, inMask, bw, bh);
+  let marked = 0;
+  for (let o = 0; o < n; o++) marked += inMask[o];
 
-  // --- Is the mark lighter or darker than what surrounds it? ---------------
-  let lift = 0, marked = 0;
-  for (let o = 0; o < n; o++) {
-    if (!inMask[o]) continue;
-    marked++;
-    const lo = 0.299 * obs[o * 3] + 0.587 * obs[o * 3 + 1] + 0.114 * obs[o * 3 + 2];
-    const lb = 0.299 * bg[o * 3]  + 0.587 * bg[o * 3 + 1]  + 0.114 * bg[o * 3 + 2];
-    lift += lo - lb;
+  let alphaMap, wmValue, bg = null;
+  if (opts.alpha && opts.alpha.map.length === n) {
+    alphaMap = opts.alpha.map;
+    wmValue = opts.alpha.wmValue;
+  } else {
+    // --- Background under the mark, by inward diffusion ----------------------
+    const warm = opts.background && opts.background.length === n * 3 ? opts.background : null;
+    bg = diffuseInward(obs, inMask, bw, bh, warm, opts.iterations);
+
+    // --- Is the mark lighter or darker than what surrounds it? ---------------
+    let lift = 0;
+    for (let o = 0; o < n; o++) {
+      if (!inMask[o]) continue;
+      const lo = 0.299 * obs[o * 3] + 0.587 * obs[o * 3 + 1] + 0.114 * obs[o * 3 + 2];
+      const lb = 0.299 * bg[o * 3]  + 0.587 * bg[o * 3 + 1]  + 0.114 * bg[o * 3 + 2];
+      lift += lo - lb;
+    }
+    wmValue = lift >= 0 ? 255 : 0;   // white badge vs dark badge
+
+    // --- Raw alpha per pixel (texture leaks into this; see header) ----------
+    const rawAlpha = new Float32Array(n);
+    for (let o = 0; o < n; o++) {
+      if (!inMask[o]) continue;
+      // Estimate per channel and take the median. Channels where the badge and
+      // background happen to be similar give an unstable ratio; the median
+      // ignores those instead of letting them dominate.
+      const a = [0, 0, 0];
+      for (let c = 0; c < 3; c++) {
+        const denom = wmValue - bg[o * 3 + c];
+        a[c] = Math.abs(denom) < 1e-3
+          ? 0
+          : (obs[o * 3 + c] - bg[o * 3 + c]) / denom;
+      }
+      a.sort((p, q) => p - q);
+      const v = a[1];
+      rawAlpha[o] = Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
+    }
+
+    // --- The badge's alpha: an edge-preserving median of the raw estimate -----
+    const localAlpha = medianFilter(rawAlpha, inMask, bw, bh, alphaRadius);
+    // If the mark looks like it has one opacity, try that too, and keep
+    // whichever leaves texture inside the mask that matches the texture around
+    // it.
+    const flat = flattenUniformAlpha(localAlpha, rawAlpha, inMask, bw, bh);
+    if (flat && textureMismatch(obs, flat, inMask, bw, bh, wmValue) <
+                textureMismatch(obs, localAlpha, inMask, bw, bh, wmValue)) {
+      localAlpha.set(flat);
+    }
+    alphaMap = localAlpha;
   }
-  const wmValue = lift >= 0 ? 255 : 0;   // white badge vs dark badge
 
-  // --- Solve for alpha, then invert the blend ------------------------------
+  // --- Invert the blend ------------------------------------------------------
   const out = new Uint8ClampedArray(imageData.data);
   const residual = emptyMask(W, H);
   let recovered = 0, opaque = 0, alphaSum = 0, clampedPx = 0, effective = 0;
@@ -120,21 +182,7 @@ export function unblendWatermark(imageData, maskData, opts = {}) {
       const o = y * bw + x;
       if (!inMask[o]) continue;
 
-      // Estimate alpha per channel and take the median. Channels where the
-      // badge and background happen to be similar give an unstable ratio; the
-      // median ignores those instead of letting them dominate.
-      const a = [0, 0, 0];
-      for (let c = 0; c < 3; c++) {
-        const denom = wmValue - bg[o * 3 + c];
-        a[c] = Math.abs(denom) < 1e-3
-          ? 0
-          : (obs[o * 3 + c] - bg[o * 3 + c]) / denom;
-      }
-      a.sort((p, q) => p - q);
-      let alpha = a[1];
-      if (!Number.isFinite(alpha)) alpha = 0;
-      alpha = Math.max(0, Math.min(1, alpha));
-
+      const alpha = alphaMap[o];
       const di = ((by + y) * W + (bx + x)) * 4;
 
       if (alpha >= maxAlpha) {
@@ -205,6 +253,8 @@ export function unblendWatermark(imageData, maskData, opts = {}) {
     return {
       result: imageData,
       residualMask: maskData,
+      background: bg,
+      alpha: { map: alphaMap, wmValue },
       stats: {
         recovered: 0, opaque: marked, marked, clamped: clampedPx,
         meanAlpha: recovered ? alphaSum / recovered : 0,
@@ -219,6 +269,8 @@ export function unblendWatermark(imageData, maskData, opts = {}) {
   return {
     result: new ImageData(out, W, H),
     residualMask: residual,
+    background: bg,
+    alpha: { map: alphaMap, wmValue },
     stats: {
       recovered,
       opaque,
@@ -235,6 +287,123 @@ export function unblendWatermark(imageData, maskData, opts = {}) {
 }
 
 /**
+ * Most watermarks that are not Gemini's — text, logos, badges — are drawn at
+ * ONE opacity. This returns a copy of the alpha map whose core is that single
+ * value, measured over all the core's pixels, or null if there is no clear
+ * core.
+ *
+ * It matters more than it looks. Recovery error is roughly the alpha error
+ * times (255 - pixel) / (1 - alpha), so a few hundredths of texture leaking
+ * into a LOCAL alpha estimate comes back as visible blotches; on smoothly
+ * shaded wood the local estimate did worse than a plain blur. A single value
+ * pooled over hundreds of pixels averages the leakage away. The caller only
+ * keeps this when the result is cleaner, so marks whose opacity really does
+ * vary keep their local map.
+ */
+function flattenUniformAlpha(alphaMap, rawAlpha, inMask, w, h) {
+  // Choose the core from a WIDE median, not from the local map: picking the
+  // pixels whose local estimate is high preferentially picks the ones where
+  // texture leaked upwards, and on a faint mark that bias dominated (0.45
+  // estimated for a true 0.30).
+  const wide = medianFilter(rawAlpha, inMask, w, h, 8);
+  const vals = [];
+  for (let o = 0; o < wide.length; o++) if (inMask[o] && wide[o] > 0.03) vals.push(wide[o]);
+  if (vals.length < 30) return null;
+  vals.sort((a, b) => a - b);
+  const p90 = vals[Math.floor(vals.length * 0.9)];
+  const core = [], coreRaw = [];
+  for (let o = 0; o < wide.length; o++) {
+    if (inMask[o] && wide[o] > 0.5 * p90) { core.push(o); coreRaw.push(rawAlpha[o]); }
+  }
+  if (core.length < 30) return null;
+  coreRaw.sort((a, b) => a - b);
+  const a0 = coreRaw[coreRaw.length >> 1];
+  // Past ~0.6 the inversion amplifies any error in a0 by 2.5x or more, and
+  // a pooled estimate is not accurate enough for that (measured: 21.5 dB
+  // flattened vs 25.3 dB local at alpha 0.75).
+  if (a0 > 0.6) return null;
+  const out = new Float32Array(alphaMap);
+  for (const o of core) out[o] = a0;
+  return out;
+}
+
+/**
+ * How unlike its surroundings the recovered texture would be: the ratio of
+ * edge density inside the mask to edge density in the ring around it, as a
+ * distance from 1 (in log terms, so too smooth and too rough count alike).
+ *
+ * "Smoothest wins" is the wrong rule here. A local alpha estimate soaks the
+ * texture up into alpha and returns a smooth patch, which scores as clean
+ * while being exactly the smear this module exists to avoid. Matching the
+ * surroundings rewards restoring texture and penalises both a smear and
+ * blotches. Inside the mask each pixel's edges are weighted by (1 - alpha),
+ * cancelling the inversion's amplification of noise that was already there.
+ */
+function textureMismatch(obs, alphaMap, inMask, w, h, wmValue) {
+  const lum = (o, a) => {
+    const k = 1 - Math.min(0.95, a);
+    return (0.299 * (obs[o * 3] - a * wmValue) + 0.587 * (obs[o * 3 + 1] - a * wmValue) +
+            0.114 * (obs[o * 3 + 2] - a * wmValue)) / k;
+  };
+  const al = (o) => (inMask[o] ? alphaMap[o] : 0);
+  let inTv = 0, inN = 0, outTv = 0, outN = 0;
+  for (let y = 0; y < h - 1; y++) {
+    for (let x = 0; x < w - 1; x++) {
+      const o = y * w + x;
+      const c = lum(o, al(o));
+      const e = Math.abs(lum(o + 1, al(o + 1)) - c) + Math.abs(lum(o + w, al(o + w)) - c);
+      const all = inMask[o] && inMask[o + 1] && inMask[o + w];
+      const none = !inMask[o] && !inMask[o + 1] && !inMask[o + w];
+      if (all) { inTv += (1 - Math.min(0.95, al(o))) * e; inN++; }
+      else if (none) { outTv += e; outN++; }
+    }
+  }
+  if (!inN || !outN || outTv <= 0) return 0;
+  return Math.abs(Math.log(Math.max(1e-6, (inTv / inN) / (outTv / outN))));
+}
+
+/**
+ * Median of `src` over a (2r+1)^2 window, for masked pixels only. Pixels
+ * outside the mask count as alpha 0, which is what they are: the mask edge is
+ * where the badge ends.
+ */
+function medianFilter(src, inMask, w, h, r) {
+  const out = new Float32Array(src.length);
+  if (r <= 0) { out.set(src); return out; }
+  const win = new Float32Array((2 * r + 1) * (2 * r + 1));
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const o = y * w + x;
+      if (!inMask[o]) continue;
+      let k = 0;
+      for (let j = Math.max(0, y - r); j <= Math.min(h - 1, y + r); j++) {
+        for (let i = Math.max(0, x - r); i <= Math.min(w - 1, x + r); i++) {
+          win[k++] = src[j * w + i];
+        }
+      }
+      out[o] = quickSelect(win, k, k >> 1);
+    }
+  }
+  return out;
+}
+
+/** k-th smallest of the first `len` entries of `a` (reorders them). */
+function quickSelect(a, len, k) {
+  let lo = 0, hi = len - 1;
+  while (lo < hi) {
+    const pivot = a[(lo + hi) >> 1];
+    let i = lo, j = hi;
+    while (i <= j) {
+      while (a[i] < pivot) i++;
+      while (a[j] > pivot) j--;
+      if (i <= j) { const t = a[i]; a[i] = a[j]; a[j] = t; i++; j--; }
+    }
+    if (k <= j) hi = j; else if (k >= i) lo = i; else return a[k];
+  }
+  return a[k];
+}
+
+/**
  * Estimate what lies under the mask by diffusing surrounding colour inward.
  *
  * This is a Jacobi relaxation of the Laplace equation with the unmasked pixels
@@ -245,9 +414,19 @@ export function unblendWatermark(imageData, maskData, opts = {}) {
  * Only the smooth baseline matters here; texture is recovered from the observed
  * pixels by the caller, not from this.
  */
-function diffuseInward(obs, inMask, w, h) {
+function diffuseInward(obs, inMask, w, h, warm = null, maxIters = Infinity) {
   const n = w * h;
   const bg = new Float32Array(obs);
+  if (warm) {
+    // Continue from the previous frame's solution: the scene moves a little
+    // between frames, so a few passes bring it up to date.
+    for (let o = 0; o < n; o++) {
+      if (!inMask[o]) continue;
+      for (let c = 0; c < 3; c++) bg[o * 3 + c] = warm[o * 3 + c];
+    }
+    relax(bg, inMask, w, h, Math.min(maxIters, 30));
+    return bg;
+  }
 
   // Seed the holes with the mean of the known pixels so relaxation starts from
   // something sane rather than from the watermark's own colour.
@@ -274,8 +453,13 @@ function diffuseInward(obs, inMask, w, h) {
       if (run > maxRun) maxRun = run;
     }
   }
-  const iters = Math.min(600, Math.max(40, maxRun * 6));
+  relax(bg, inMask, w, h, Math.min(maxIters, 600, Math.max(40, maxRun * 6)));
+  return bg;
+}
 
+/** Jacobi relaxation of `bg` inside the mask, in place. */
+function relax(bg, inMask, w, h, iters) {
+  const n = w * h;
   const next = new Float32Array(bg);
   for (let it = 0; it < iters; it++) {
     for (let y = 0; y < h; y++) {
@@ -300,7 +484,50 @@ function diffuseInward(obs, inMask, w, h) {
   return bg;
 }
 
-function maskBbox(maskData, pad) {
+/**
+ * Fill the masked pixels with a smooth interpolation of their surroundings.
+ *
+ * The plainest possible fill, and deliberately so: it is what video uses on
+ * frames where the background has moved since the AI last ran, because it
+ * follows the scene from frame to frame instead of freezing an old patch.
+ *
+ * @param {ImageData} imageData
+ * @param {ImageData} maskData   alpha > 64 marks pixels to fill
+ * @param {object} [opts]
+ * @param {Float32Array} [opts.background] previous result, to warm-start
+ * @returns {{ result: ImageData, background: Float32Array|null }}
+ */
+export function smoothFill(imageData, maskData, opts = {}) {
+  const { width: W, height: H } = imageData;
+  const bbox = maskBbox(maskData, 2);
+  if (!bbox) return { result: imageData, background: null };
+  const { x: bx, y: by, w: bw, h: bh } = bbox;
+  const n = bw * bh;
+  const obs = new Float32Array(n * 3);
+  const inMask = new Uint8Array(n);
+  for (let y = 0; y < bh; y++) {
+    for (let x = 0; x < bw; x++) {
+      const si = ((by + y) * W + (bx + x)) * 4, o = y * bw + x;
+      for (let c = 0; c < 3; c++) obs[o * 3 + c] = imageData.data[si + c];
+      inMask[o] = maskData.data[si + 3] > 64 ? 1 : 0;
+    }
+  }
+  const warm = opts.background && opts.background.length === n * 3 ? opts.background : null;
+  const bg = diffuseInward(obs, inMask, bw, bh, warm, opts.iterations);
+  const out = new Uint8ClampedArray(imageData.data);
+  for (let y = 0; y < bh; y++) {
+    for (let x = 0; x < bw; x++) {
+      const o = y * bw + x;
+      if (!inMask[o]) continue;
+      const di = ((by + y) * W + (bx + x)) * 4;
+      for (let c = 0; c < 3; c++) out[di + c] = bg[o * 3 + c];
+    }
+  }
+  return { result: new ImageData(out, W, H), background: bg };
+}
+
+/** Bounding box of the mask (alpha > 64), grown by `pad`; null when empty. */
+export function maskBbox(maskData, pad = 0) {
   const { width: w, height: h, data } = maskData;
   let minX = w, minY = h, maxX = -1, maxY = -1;
   for (let y = 0; y < h; y++) {

@@ -45,6 +45,12 @@ jobs:
         run: node tools/test-dewatermark.mjs
       - name: Texture fill tests
         run: node tools/test-texturefill.mjs
+      - name: Zoom and pan tests
+        run: node tools/test-viewport.mjs
+      - name: Gemini exact-removal tests
+        run: node tools/test-gemini.mjs
+      - name: Video per-frame cleaning tests
+        run: node tools/test-video-clean.mjs
       - name: Static consistency checks
         run: node tools/check.mjs
       - name: Syntax-check every module

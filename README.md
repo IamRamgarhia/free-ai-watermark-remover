@@ -87,7 +87,9 @@ Most online watermark removers upload your private photos to a server you don't 
 | ⚠️ Honest about limits | Removing the badge does **not** remove SynthID — see the [guide](static/guide.html) |
 | 🔍 Auto watermark detection | Finds the badge instead of assuming where it is |
 | 🎨 Manual masking | Rectangle, brush, eraser, undo — mouse **or** keyboard |
-| ♻️ Recovery, not repaint | Solves for the picture under a see-through watermark |
+| ✨ Exact Gemini removal | Inverts the Gemini sparkle with its calibrated alpha map — the original pixels come back, nothing is repainted, no AI model needed |
+| ♻️ Recovery, not repaint | Solves for the picture under other see-through watermarks |
+| 🎞 Per-frame video cleaning | Every frame is cleaned from its own pixels, so moving shots don't get a frozen patch |
 | 🔄 BEFORE/AFTER compare | Toggle to see original vs cleaned |
 | 🔒 Offline after first load | Your files are never uploaded; the app works with no connection |
 | 📱 Installable PWA | Desktop icon, standalone window, offline support |
@@ -137,7 +139,7 @@ Most online watermark removers upload your private photos to a server you don't 
 5. Run model. Output is `[-1, 1]` float32; map to `[0, 255]` via `(v * 0.5 + 0.5) * 255`.
 6. Composite into original at full resolution — only masked pixels are replaced, rest stays pixel-identical.
 
-**How removal actually works (two stages)**
+**How removal actually works**
 
 Most generator badges are *semi-transparent*, which means the picture underneath
 them was never destroyed — it was blended:
@@ -146,20 +148,42 @@ them was never destroyed — it was blended:
 observed = alpha x watermark + (1 - alpha) x original
 ```
 
-That inverts. So stage one estimates `alpha` per pixel (using a smooth
-interpolation of the surroundings purely as a baseline) and solves for the
-original. Texture — wood grain, skin, brick — comes back out of the real data
-instead of being repainted. Measured against ground truth on synthetic tests this
-scores 7-12 dB higher than filling the area with neighbouring colour.
+That inverts, *if you know `alpha` at every pixel*. How well it works depends
+entirely on how well `alpha` is known:
 
-Stage two runs MI-GAN on whatever stage one could *not* recover: the fully opaque
-core, where no information about the original survives. For a typical translucent
-badge that residual is a few percent of the mask, and often nothing at all — in
-which case no pixels are invented anywhere.
+1. **Gemini: alpha is known exactly.** Gemini composites the same sparkle onto
+   every image, and its calibrated alpha maps (48/96 px legacy, 36/96 px for
+   Gemini 3.5+, from [GeminiWatermarkTool](https://github.com/allenk/GeminiWatermarkTool))
+   ship with the app. The sparkle is located at Gemini's own placement for that
+   resolution, refined to the pixel, and inverted. On synthetic ground truth the
+   result is 54–58 dB (8-bit rounding), i.e. the original pixels. Resized files
+   get a strength correction; look-alikes in images without a watermark are
+   rejected (0 false positives in 360 clean test images).
+2. **Other translucent marks: alpha is estimated.** A per-pixel estimate is
+   useless on its own — it absorbs the pixel's texture and cancels it out, which
+   is how an earlier version ended up returning a blur. Instead the estimate is
+   median-filtered and, when the mark has one opacity (most text and logos), a
+   single value pooled over the whole mark is used. Against a *fair* smooth-fill
+   baseline that recovers 0.6–0.9 of the real texture, +2 to +7 dB.
+3. **Opaque cores and objects: filled.** Whatever could not be recovered is
+   filled — by copying matching texture from nearby when it repeats, otherwise
+   by MI-GAN. Steps 1 and 2 need no model at all, so watermark mode works while
+   the model is still downloading.
 
 Set the mode to **Object / opaque logo** to skip stage one. Un-blending assumes
 the mask covers a translucent overlay; pointed at a solid object it would solve
 for meaningless values, so object removal goes straight to generative fill.
+
+**Video**
+
+Each frame is cleaned from its own pixels, on a crop around the mask: Gemini by
+exact inversion (well under 1 ms per frame), translucent marks with an alpha map
+that is estimated once and refined as the video plays (a moving scene averages
+out the texture leakage), and fills using the AI patch only while the background
+around the mask still matches. When the scene moves on, recording pauses, the AI
+re-runs on the current frame, and recording resumes, so the pause never shows in
+the output. On a synthetic panning shot this measured 59 / 32 / 23 dB for
+Gemini / translucent / opaque marks, against 16–18 dB for the old frozen patch.
 
 **Finding the watermark**
 
@@ -237,12 +261,22 @@ There is **no build step**. No Node, no npm, no bundler. Edit a file, refresh, s
 
 ### Tests
 
-Two scripts, no dependencies and nothing to install — plain Node:
+No dependencies and nothing to install — plain Node:
 
 ```bash
-node tools/test-inpainter.mjs   # pixel-math regression tests
-node tools/check.mjs            # cross-file consistency checks
+node tools/test-inpainter.mjs     # pixel-math regression tests
+node tools/test-detect.mjs        # watermark finding
+node tools/test-dewatermark.mjs   # un-blending vs a fair smooth-fill baseline
+node tools/test-gemini.mjs        # exact Gemini removal + false-positive guard
+node tools/test-texturefill.mjs   # texture copying
+node tools/test-video-clean.mjs   # per-frame video cleaning on a panning shot
+node tools/test-viewport.mjs      # zoom/pan geometry
+node tools/check.mjs              # cross-file consistency checks
 ```
+
+The quality tests measure against ground truth (PSNR) *and* check that real
+texture came back, against a baseline that is actually converged — an earlier
+baseline was not, and let a stage that returned a blur pass as a 10 dB win.
 
 `test-inpainter.mjs` covers the tensor math (mask polarity, `[-1,1]`
 normalization, planar CHW layout, bbox detection). That code fails *silently*
@@ -264,11 +298,25 @@ exist. Both run in CI on every push and pull request.
 | **R** | Rectangle tool |
 | **B** | Brush tool |
 | **E** | Eraser tool |
+| **H** | Pan tool (drag to move a zoomed view) |
+| **+ / −** | Zoom in / out |
+| **0** | Fit the whole image |
+| **1** | Actual pixels (100%) |
 | **Space** | Toggle BEFORE / AFTER compare |
 | **Ctrl+Z** | Undo brush stroke |
 | **Esc** | Start over (with confirm) |
 | **D** | Download result |
 | **`** | Toggle the diagnostics panel |
+
+### Zooming in for precise masks
+
+Scroll over the image to zoom in at the cursor (trackpad pinch works too), or
+use the **− / + / Fit / 1:1** buttons in the toolbar. Right-drag or middle-drag
+pans with any tool; on touch screens, pinch to zoom and drag with the Pan tool.
+From about 300% the preview switches to crisp, unsmoothed pixels so you can see
+exactly where a watermark's edge is. The mask is always stored at the image's
+full resolution, so zoom only changes how precisely you can place it, never
+what gets processed.
 
 ### Drawing a mask without a mouse
 
@@ -303,7 +351,8 @@ crosshair — the mask changes only on an explicit **Enter**.
 | Image cap ~100 MB | Browser tab memory ceiling | Resize before upload |
 | Short videos only (~30 s) | Per-frame processing overhead + memory | Trim long clips first |
 | Model is fixed 512×512 | MI-GAN ONNX export | Internally we crop + resize for higher effective resolution at the mask |
-| Static-mask video mode | One AI pass + copy patch onto all frames | Best for corner watermarks (95% case); moving content behind the watermark may show a static patch |
+| Video is recorded in real time | MediaRecorder captures playback; heavy per-frame work can drop frames on slow machines | Gemini and opaque marks are cheap per frame; large translucent masks cost the most |
+| Non-Gemini translucent marks are estimated, not known | One image does not determine the alpha map exactly | Results are better than a blur, not exact; a tight mask helps |
 | Complex backgrounds (faces, fine text, architecture) | LaMa/MI-GAN inpainting limitation, not a bug | Use a tighter mask; consider desktop tools like [IOPaint](https://github.com/Sanster/IOPaint) for hard cases |
 | WebGPU not in all browsers yet | Browser support catching up | Auto-falls back to WASM multi-threading |
 
@@ -385,6 +434,7 @@ If WatermarkOut saved you money, time, or a privacy headache:
 - **[ONNX Runtime Web](https://onnxruntime.ai/)** — Microsoft's browser ML runtime
 - **[lxfater/inpaint-web](https://github.com/lxfater/inpaint-web)** — reference implementation we learned from
 - **[Sanster/IOPaint](https://github.com/Sanster/IOPaint)** — gold-standard LaMa wrapper, source of our composite logic
+- **[allenk/GeminiWatermarkTool](https://github.com/allenk/GeminiWatermarkTool)** — calibrated Gemini alpha maps and placement rules (MIT, © 2024 AllenK (Kwyshell); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md))
 - **[dinoBOLT/Gemini-Watermark-Remover](https://github.com/dinoBOLT/Gemini-Watermark-Remover)** — reference for browser-based watermark removal
 
 ---

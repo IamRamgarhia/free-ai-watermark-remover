@@ -101,7 +101,7 @@
       "name": "DiceCodes",
       "url": "https://dicecodes.com"
     },
-    "softwareVersion": "1.5.0",
+    "softwareVersion": "1.7.0",
     "inLanguage": "en",
     "isAccessibleForFree": true,
     "browserRequirements": "Requires JavaScript and WebAssembly. Chrome/Edge 90+, Firefox 90+, Safari 16.4+.",
@@ -143,7 +143,7 @@
     <div class="brand">
       <img src="assets/logo-icon.svg" alt="" class="brand-icon">
       <span class="brand-name">WatermarkOut</span>
-      <span class="badge" id="version-badge">v1.5.0</span>
+      <span class="badge" id="version-badge">v1.7.0</span>
     </div>
     <nav class="topnav">
       <button class="nav-btn active" data-view="app">Editor</button>
@@ -354,6 +354,9 @@
           <button class="tool-btn" data-tool="erase" aria-pressed="false" title="Eraser (E) — remove from mask">
             <span class="tool-icon">⌫</span> Erase
           </button>
+          <button class="tool-btn" data-tool="pan" aria-pressed="false" title="Pan (H) — drag to move a zoomed view. Right- or middle-drag pans with any tool.">
+            <span class="tool-icon">✋</span> Pan
+          </button>
           <div class="separator"></div>
           <label class="tool-label">Size</label>
           <input type="range" min="2" max="120" value="30" id="brush-size" class="slider slider-sm">
@@ -363,7 +366,13 @@
           <button class="tool-btn" id="btn-clear-mask" title="Clear mask">✕ Clear</button>
           <div class="separator"></div>
           <button class="tool-btn" id="btn-compare" title="Compare (Space)">⊟ Compare</button>
-          <button class="tool-btn" id="btn-zoom-fit" title="Fit">⤢ Fit</button>
+          <div class="zoom-group" role="group" aria-label="Zoom">
+            <button class="tool-btn" id="btn-zoom-out" title="Zoom out (−)" aria-label="Zoom out">−</button>
+            <span class="zoom-level" id="zoom-level" title="Scroll over the image to zoom at the cursor">100%</span>
+            <button class="tool-btn" id="btn-zoom-in" title="Zoom in (+)" aria-label="Zoom in">+</button>
+            <button class="tool-btn" id="btn-zoom-fit" title="Fit the whole image (0)">⤢ Fit</button>
+            <button class="tool-btn" id="btn-zoom-100" title="Actual pixels, 1:1 (1)">1:1</button>
+          </div>
           <div class="ml-auto"></div>
           <button class="tool-btn tool-danger" id="btn-delete-canvas" title="Delete this file and start over (Esc)">
             <span class="tool-icon">🗑</span> Delete
@@ -384,13 +393,16 @@
             <video id="video-result" hidden controls preload="auto"></video>
           </div>
 
+          <!-- Outline of the brush, at its true size for the current zoom -->
+          <div class="brush-cursor" id="brush-cursor" hidden aria-hidden="true"></div>
+
           <!-- BEFORE/AFTER tag for video preview -->
           <div class="preview-label" id="preview-label" hidden></div>
 
           <!-- Hint shown when no mask drawn yet -->
           <div class="stage-hint" id="stage-hint">
             <p>↑ Click <strong>Detect watermark</strong>, or drag a rectangle over it</p>
-            <p class="stage-hint-kbd">Keyboard: focus the canvas, then arrow keys to move, Enter to draw</p>
+            <p class="stage-hint-kbd">Scroll to zoom, right-drag to pan · Keyboard: focus the canvas, arrows to move, Enter to draw</p>
           </div>
 
           <!-- Screen-reader announcements for keyboard masking -->
